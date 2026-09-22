@@ -210,6 +210,33 @@ waiting for it to become healthy. Nothing in the codebase depends on a
 cloud service, which keeps a later deployment a packaging problem rather
 than a rewrite.
 
+## ADR 13: zod via nestjs-zod, with the schemas shared through `packages/contracts`
+
+**Context.** The API validates every request and the web app types every
+response. Two definitions of the same body, one per side, drift the moment
+one of them changes, and the drift shows up as a runtime surprise in the
+client rather than a failing build.
+
+**Decision.** `packages/contracts` holds one zod schema per request and
+response body, one file per resource, and exports the inferred type under
+the same name. The API validates query parameters through
+`ZodValidationPipe` on thin `createZodDto` classes that live next to the
+controllers (nestjs-zod keys on the class), and serializes every response
+through `ZodSerializerDto` with the response schema, so a handler that
+returns something outside the contract fails at the API as a 500 rather
+than at the client. A global `ErrorFilter` turns a failed parse, a
+`DomainError` and Nest's HTTP exceptions into the one `ErrorResponse`
+shape. The web app parses each response with the same schema
+(`apps/web/src/lib/api.ts`).
+
+**Consequences.** One definition, no drift, and the contract is readable
+in one place. The domain stays zod-free (ADR 3), so the contracts mirror
+its value types by hand (`FitDto`, `YearMonth`, `VehicleVariantDto`); the
+mapping code in the API spreads domain values into contract types, which
+is where the type checker catches a mismatch. `packages/contracts` depends
+on zod alone; the DTO classes are the only nestjs-zod surface and hold no
+logic.
+
 ## ADR 14: Workspace packages are consumed as TypeScript source
 
 **Context.** `packages/domain` and `packages/contracts` are imported by
