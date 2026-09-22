@@ -2,7 +2,7 @@
 // file (integration files are sequential) and starts from an empty
 // database, so it also proves the committed migrations apply from nothing.
 
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -152,5 +152,24 @@ describe("constraints", () => {
     await expect(db.insert(orders).values({ id: "o_test_b", ...order })).rejects.toMatchObject({
       cause: { constraint: "orders_idempotency_key_unique" },
     });
+  });
+});
+
+describe("seeding a broken dataset", () => {
+  it("rolls back and leaves the previous catalogue in place", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "passform-broken-"));
+    try {
+      await generateDataset({ profile: "small", out: dir });
+      await writeFile(join(dir, "parts.jsonl"), "{not json\n");
+      const before = await count("parts");
+
+      await expect(seedDatabase({ from: dir })).rejects.toThrow();
+
+      expect(await count("parts")).toBe(before);
+      // The pool still hands out a working connection afterwards.
+      expect(await count("suppliers")).toBeGreaterThan(0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -95,6 +95,7 @@ export async function seedDatabase({
 
     await client.query("COMMIT");
     timer.step("commit");
+    client.release();
 
     return {
       categories: categoryList.length,
@@ -104,10 +105,12 @@ export async function seedDatabase({
       fitments,
     };
   } catch (error) {
-    await client.query("ROLLBACK");
+    // A failed COPY can leave the connection mid-protocol: roll back on a
+    // best-effort basis and hand the client back with the error so the pool
+    // discards it instead of reusing it.
+    await client.query("ROLLBACK").catch(() => undefined);
+    client.release(error instanceof Error ? error : new Error(String(error)));
     throw error;
-  } finally {
-    client.release();
   }
 }
 
