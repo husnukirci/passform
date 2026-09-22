@@ -60,10 +60,13 @@ export async function rebuildIndex({
   });
   log(`created ${index}`);
 
+  // Everything up to and including verification can fail without the alias
+  // having moved; anything after the swap must not delete the live index.
+  let maxFitments = 0;
+  let inIndex: number;
   try {
     const categoryPaths = await loadCategoryPaths(db);
     let indexed = 0;
-    let maxFitments = 0;
 
     for await (const batch of partBatches(db)) {
       const fitmentsByPart = await loadFitments(
@@ -88,26 +91,26 @@ export async function rebuildIndex({
     }
 
     await es.indices.refresh({ index });
-    const [{ count: inIndex }, expected] = await Promise.all([
-      es.count({ index }),
-      countSource(db),
-    ]);
-    if (inIndex !== expected) throw new IndexVerificationError(index, expected, inIndex);
+    const [counted, expected] = await Promise.all([es.count({ index }), countSource(db)]);
+    if (counted.count !== expected)
+      throw new IndexVerificationError(index, expected, counted.count);
+    inIndex = counted.count;
 
     await es.indices.putSettings({ index, settings: PARTS_SETTINGS_FOR_SERVING });
-    const { from } = await swapAlias(index, es);
-    if (from !== null) await deleteIndex(from, es);
-
-    const seconds = Math.round((performance.now() - started) / 100) / 10;
-    log(
-      `${index}: ${inIndex} documents, largest fitments array ${maxFitments}, ${seconds.toFixed(1)}s`,
-    );
-    return { index, count: inIndex, seconds, maxFitments };
   } catch (error) {
     // The alias never moved; nothing reads the half-built index, so drop it.
     await deleteIndex(index, es).catch(() => undefined);
     throw error;
   }
+
+  const { from } = await swapAlias(index, es);
+  if (from !== null) await deleteIndex(from, es);
+
+  const seconds = Math.round((performance.now() - started) / 100) / 10;
+  log(
+    `${index}: ${inIndex} documents, largest fitments array ${maxFitments}, ${seconds.toFixed(1)}s`,
+  );
+  return { index, count: inIndex, seconds, maxFitments };
 }
 
 export async function countParts(db: Db): Promise<number> {
