@@ -42,11 +42,11 @@ const variant: VehicleVariant = {
 
 const partRow: PartRow = {
   id: "p_0000001",
-  sku: "AUT-000001",
-  brand: "Auteko",
+  sku: "TOR-000001",
+  brand: "Torbenna",
   brandTier: "oe",
   categoryId: "brakes/pads",
-  name: "Auteko brake pad set",
+  name: "Torbenna brake pad set",
   oeRef: "OE-4471",
   attributes: { axle: "front", widthMm: 131 },
   priceCents: 4990,
@@ -57,11 +57,11 @@ const partRow: PartRow = {
 
 const part: Part = {
   id: "p_0000001",
-  sku: "AUT-000001",
-  brand: "Auteko",
+  sku: "TOR-000001",
+  brand: "Torbenna",
   brandTier: "oe",
   categorySlug: "brakes/pads",
-  name: "Auteko brake pad set",
+  name: "Torbenna brake pad set",
   oeRef: "OE-4471",
   attributes: { axle: "front", widthMm: 131 },
   priceCents: 4990,
