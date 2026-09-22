@@ -57,7 +57,7 @@ export function partId(n: number): string {
 const MIN_BUILD_YEAR = 2004;
 const MAX_BUILD_YEAR = 2023;
 const LAST_MONTH = monthIndex("2025-12");
-/** Open-ended windows are treated as ten years long when placing a fitment window. */
+/** Open-ended windows are treated as ten years long, capped at LAST_MONTH, when placing a fitment window. */
 const OPEN_WINDOW_MONTHS = 120;
 
 export function monthIndex(ym: YearMonth): number {
@@ -374,7 +374,8 @@ function synthFitment(rng: Rng, pos: number, index: VariantIndex, partAxle: Axle
   let buildFrom: YearMonth | null = null;
   let buildTo: YearMonth | null = null;
   if (rng.chance(FITMENT_WINDOW_RATE)) {
-    const span = (window.to ?? window.from + OPEN_WINDOW_MONTHS) - window.from;
+    const end = Math.min(window.to ?? window.from + OPEN_WINDOW_MONTHS, LAST_MONTH);
+    const span = Math.max(end, window.from) - window.from;
     const fromOffset = rng.int(0, span);
     const toOffset = rng.int(fromOffset, span);
     buildFrom = yearMonthAt(window.from + fromOffset);
