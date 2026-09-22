@@ -8,6 +8,13 @@
     "emitDecoratorMetadata": true,
     "types": ["node"]
   },
-  "include": ["src", "test", "vitest.config.ts", "vitest.integration.config.ts"],
-  "references": [{ "path": "../../packages/domain" }, { "path": "../../packages/contracts" }]
+  "include": ["src", "scripts", "test", "vitest.config.ts", "vitest.integration.config.ts"],
+  "references": [
+    {
+      "path": "../../packages/domain"
+    },
+    {
+      "path": "../../packages/contracts"
+    }
+  ]
 }

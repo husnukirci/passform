@@ -82,7 +82,7 @@ rules are pure functions over plain data.
   - [x] `searchQuery`: `buildSearchQuery` emitting the Elasticsearch body (nested fitment filter, universal short-circuit, facets, boosts, sorts, paging)
   - [x] `orders`: line and order totals in cents, canonical JSON, idempotency key validation, reservation expiry
   - [x] `importRows`: row validation without zod, chunk range computation
-- [ ] DB: Drizzle schema + migrations (`vehicle_variants`, `categories`,
+- [x] DB: Drizzle schema + migrations (`vehicle_variants`, `categories`,
       `suppliers`, `parts`, `fitments`, `imports`, `import_chunks`, `orders`,
       `order_lines`, `stock_reservations`); deterministic generator with
       `small` and `large` profiles and supplier import-file output; COPY-based

@@ -83,4 +83,5 @@ jobs:
           pg_isready -h localhost -p 5432 -U passform
           exec 3<>/dev/tcp/localhost/6379 && printf 'PING\r\n' >&3 && head -c 5 <&3 | grep -q PONG
           curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=30s'
+      - run: npm run db:migrate
       - run: npm run test:integration

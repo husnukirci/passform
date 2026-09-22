@@ -89,6 +89,37 @@ design; the `ask` result is the only softness, and it is a verdict with a
 named equipment code, not a lower score. Filter clauses are cached by
 Elasticsearch, which also makes this the cheaper shape.
 
+## ADR 7: Deterministic generator with size profiles; all names invented
+
+**Context.** The project needs a catalogue large enough to make index
+builds, imports and search behaviour measurable, but it must not carry real
+vehicle, brand or company data, and every number in the README has to be
+reproducible by anyone from a fresh clone. Checking a dataset into git is
+out: the `large` profile is gigabytes.
+
+**Decision.** `apps/api/scripts/generate.ts` synthesises the dataset from a
+seeded mulberry32 PRNG (seed `0x5eed`) at two profiles, `small` (2,000
+variants, 5,000 parts) for tests, CI and everyday development, and `large`
+(50,000 variants, 2,000,000 parts, about 12 fitments per non-universal
+part) for the demo and the measured numbers. Output is streamed line by
+line; only the variants' build windows stay in memory while parts are
+generated. Ids are readable and sequential (`v_000001`, `p_0000001`), so
+the same profile is byte-identical across runs and a test asserts it. Every
+make, model, brand and supplier is an invented compound kept in one file,
+`apps/api/scripts/names.ts`, each checked against the web before use; the
+category tree is fixed in `categories.ts`. Seeding streams the files into
+Postgres with `COPY` inside one transaction, so a reseed either lands
+completely or not at all.
+
+**Consequences.** Any figure in the docs can be regenerated on a laptop in
+seconds (`large` generates in about ten seconds and seeds in minutes), and
+a bug report can name a part id that everyone can reproduce. The
+distributions are stylised (20% shared registration keys, 30% unknown
+equipment, 5% universal parts, 8% out of stock) rather than realistic, and
+changing any rule or name changes every id after it, which is acceptable
+because nothing outside the generated files refers to them. The name file
+is the single place the name scrub has to audit.
+
 ## ADR 12: Local-first infrastructure; deployment deferred to Tier 3
 
 **Context.** The project must run from a fresh clone and in CI with no
