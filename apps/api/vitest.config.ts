@@ -4,6 +4,6 @@ import { defineConfig } from "vitest/config";
 // transformer honours the flag from tsconfig.json, so no extra plugin.
 export default defineConfig({
   test: {
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
   },
 });

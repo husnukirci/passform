@@ -20,7 +20,12 @@
     "test": "npm run test --workspaces --if-present",
     "test:integration": "npm run test:integration -w apps/api",
     "build": "npm run build --workspaces --if-present",
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:migrate": "dotenv -- npm run db:migrate -w apps/api --",
+    "data:generate": "dotenv -- npm run data:generate -w apps/api --",
+    "data:generate-import": "dotenv -- npm run data:generate-import -w apps/api --",
+    "db:seed": "dotenv -- npm run db:seed -w apps/api --",
+    "db:setup": "npm run db:migrate && npm run data:generate && npm run db:seed && echo 'db:setup: index:rebuild arrives in phase 3; stopping after seed.'"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
