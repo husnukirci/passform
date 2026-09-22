@@ -4,8 +4,10 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from "nestjs-zod";
 
 import { HealthController } from "./health/health.controller.js";
 import { ErrorFilter } from "./infra/http/error.filter.js";
+import { VehiclesModule } from "./vehicles/vehicles.module.js";
 
 @Module({
+  imports: [VehiclesModule],
   controllers: [HealthController],
   providers: [
     // Registered here rather than in main.ts so the testing module gets the
