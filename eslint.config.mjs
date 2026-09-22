@@ -1,3 +1,5 @@
+import { builtinModules } from "node:module";
+
 import js from "@eslint/js";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
@@ -9,7 +11,10 @@ import tseslint from "typescript-eslint";
 // Packages the pure domain core must never import. Enforces the CLAUDE.md
 // invariant mechanically instead of by grep.
 const DOMAIN_FORBIDDEN_IMPORTS = [
-  { group: ["node:*"], message: "packages/domain must not use Node built-ins." },
+  {
+    group: [...builtinModules, ...builtinModules.map((name) => `node:${name}`)],
+    message: "packages/domain must not use Node built-ins.",
+  },
   {
     group: ["@nestjs/*", "next", "next/*", "drizzle-orm", "drizzle-orm/*", "zod", "bullmq"],
     message: "packages/domain is framework-free: plain data in, plain data out.",
