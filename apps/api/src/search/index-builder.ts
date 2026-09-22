@@ -98,7 +98,7 @@ export async function rebuildIndex({
     const { from } = await swapAlias(index, es);
     if (from !== null) await deleteIndex(from, es);
 
-    const seconds = (performance.now() - started) / 1000;
+    const seconds = Math.round((performance.now() - started) / 100) / 10;
     log(
       `${index}: ${inIndex} documents, largest fitments array ${maxFitments}, ${seconds.toFixed(1)}s`,
     );
