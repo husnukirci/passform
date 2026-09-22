@@ -23,13 +23,15 @@ npm run dev
 ```
 
 `db:setup` applies the migrations, generates the `small` synthetic profile
-(2,000 vehicle variants, 5,000 parts) into `.data/small` and seeds Postgres
-from it. The `large` profile (50,000 variants, 2,000,000 parts) is for the
-numbers in [docs/numbers.md](docs/numbers.md):
+(2,000 vehicle variants, 5,000 parts) into `.data/small`, seeds Postgres
+from it and builds the Elasticsearch `parts` alias from the seeded rows. The
+`large` profile (50,000 variants, 2,000,000 parts) is for the numbers in
+[docs/numbers.md](docs/numbers.md):
 
 ```sh
 npm run data:generate -- --profile large
 npm run db:seed -- --from .data/large
+npm run index:rebuild
 ```
 
 The web app is at `http://localhost:3000` and the API at
@@ -37,19 +39,20 @@ The web app is at `http://localhost:3000` and the API at
 
 ## Scripts
 
-| Script                         | What it does                                                |
-| ------------------------------ | ----------------------------------------------------------- |
-| `npm run dev`                  | API and web app together, with the root `.env` loaded       |
-| `npm run lint`                 | ESLint over every workspace                                 |
-| `npm run typecheck`            | `tsc -b` over the project references                        |
-| `npm test`                     | Unit tests in every workspace                               |
-| `npm run test:integration`     | API integration tests against the docker-compose services   |
-| `npm run build`                | Builds every workspace                                      |
-| `npm run db:migrate`           | Applies the committed Drizzle migrations                    |
-| `npm run data:generate`        | Generates a dataset (`--profile small\|large`, `--out DIR`) |
-| `npm run data:generate-import` | Writes a supplier import file (`--rows N --supplier s_01`)  |
-| `npm run db:seed`              | Seeds the catalogue from a dataset directory (`--from DIR`) |
-| `npm run db:setup`             | migrate → generate small → seed (→ index rebuild, Phase 3)  |
+| Script                         | What it does                                                 |
+| ------------------------------ | ------------------------------------------------------------ |
+| `npm run dev`                  | API and web app together, with the root `.env` loaded        |
+| `npm run lint`                 | ESLint over every workspace                                  |
+| `npm run typecheck`            | `tsc -b` over the project references                         |
+| `npm test`                     | Unit tests in every workspace                                |
+| `npm run test:integration`     | API integration tests against the docker-compose services    |
+| `npm run build`                | Builds every workspace                                       |
+| `npm run db:migrate`           | Applies the committed Drizzle migrations                     |
+| `npm run data:generate`        | Generates a dataset (`--profile small\|large`, `--out DIR`)  |
+| `npm run data:generate-import` | Writes a supplier import file (`--rows N --supplier s_01`)   |
+| `npm run db:seed`              | Seeds the catalogue from a dataset directory (`--from DIR`)  |
+| `npm run index:rebuild`        | Rebuilds the `parts` index from Postgres and swaps the alias |
+| `npm run db:setup`             | migrate → generate small → seed → index rebuild              |
 
 ## Plan
 
