@@ -78,8 +78,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Verify services are reachable
+        # The runner has no redis-cli, so Redis gets a raw PING over bash's TCP device.
         run: |
           pg_isready -h localhost -p 5432 -U passform
-          redis-cli -h localhost -p 6379 ping
+          exec 3<>/dev/tcp/localhost/6379 && printf 'PING\r\n' >&3 && head -c 5 <&3 | grep -q PONG
           curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=30s'
       - run: npm run test:integration
