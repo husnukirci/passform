@@ -1,0 +1,86 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_PUBLIC_API_URL: http://localhost:4000
+
+jobs:
+  check:
+    name: lint, typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  integration:
+    name: integration tests against services
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://passform:passform@localhost:5432/passform
+      REDIS_URL: redis://localhost:6379
+      ELASTICSEARCH_URL: http://localhost:9200
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: passform
+          POSTGRES_PASSWORD: passform
+          POSTGRES_DB: passform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U passform -d passform"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.19.21
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: "false"
+          ES_JAVA_OPTS: -Xms1g -Xmx1g
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -fsS http://localhost:9200/_cluster/health?wait_for_status=yellow"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Verify services are reachable
+        # The runner has no redis-cli, so Redis gets a raw PING over bash's TCP device.
+        run: |
+          pg_isready -h localhost -p 5432 -U passform
+          exec 3<>/dev/tcp/localhost/6379 && printf 'PING\r\n' >&3 && head -c 5 <&3 | grep -q PONG
+          curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=30s'
+      - run: npm run test:integration

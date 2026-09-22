@@ -1,0 +1,12 @@
+{
+  "name": "@passform/domain",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure, framework-free domain rules for passform. Plain data in, plain data out.",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}
