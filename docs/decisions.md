@@ -42,6 +42,53 @@ Drizzle has a smaller ecosystem than TypeORM or Prisma inside NestJS, so the
 database module is hand-wired rather than provided by an integration
 package.
 
+## ADR 3: Domain core as a pure, isomorphic TypeScript package
+
+**Context.** Fit evaluation, registration-key resolution, the search query
+builder, order arithmetic and import validation are the rules the project
+exists to demonstrate. They must be testable in milliseconds, readable
+without knowing a framework, and reusable from the API, the queue
+processors and the web app alike.
+
+**Decision.** `packages/domain` is plain TypeScript with plain-data inputs
+and outputs and no imports from Nest, Next, Drizzle, zod, BullMQ, the
+Elasticsearch client or Node built-ins; ESLint enforces the ban. The search
+query builder emits the Elasticsearch body as a plain object and is tested
+with `toEqual` against the exact body, without Elasticsearch running.
+Import rows are validated by hand-written checks that collect every error,
+because zod is a framework concern and the domain must not depend on it.
+Every behaviour is built strict red-green-refactor; the module is the
+specification.
+
+**Consequences.** The rules run identically in the API, in a worker and in
+the browser, and the whole suite runs in well under a second. The package
+must stay erasable TypeScript so Node's type stripping can load it (ADR
+14). Validation without zod costs a small hand-rolled collector and a
+duplicated shape between `ImportRow` here and the zod schema in
+`packages/contracts` once Phase 4 adds it; a contracts test will pin the two together.
+
+## ADR 4: Fitment is a filter, never a score
+
+**Context.** A part that does not fit the vehicle must never appear in
+results, however relevant its text or however good its price. Search
+engines blur this by letting every clause contribute to the score, so a
+strong text match can outrank a correct fitment.
+
+**Decision.** `buildSearchQuery` places the fitment constraint in
+`query.bool.filter` (a nested query over fitment rows, or `universal:
+true`) and the ranking signals (`in_stock`, brand tier) in
+`query.bool.should`. No fitment field ever appears in a scoring clause; a
+unit test asserts it. Ranking operates only over parts that survived the
+filter. The same rule holds outside Elasticsearch: `evaluateFit` returns a
+verdict with a reason, never a number.
+
+**Consequences.** Results are explainable: every hit carries a fit result
+and reason, and the stage strip on the results page can show how many
+parts the filter kept. Fuzzy fitment ("probably fits") is impossible by
+design; the `ask` result is the only softness, and it is a verdict with a
+named equipment code, not a lower score. Filter clauses are cached by
+Elasticsearch, which also makes this the cheaper shape.
+
 ## ADR 12: Local-first infrastructure; deployment deferred to Tier 3
 
 **Context.** The project must run from a fresh clone and in CI with no

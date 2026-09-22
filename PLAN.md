@@ -66,22 +66,22 @@ rules are pure functions over plain data.
 
 ### Tier 1 — v1 release
 
-- [ ] Scaffold: npm workspaces; `apps/api` (NestJS), `apps/web` (Next.js App
+- [x] Scaffold: npm workspaces; `apps/api` (NestJS), `apps/web` (Next.js App
       Router), `packages/domain`, `packages/contracts`; TS strict; Tailwind v4
-- [ ] Tooling: ESLint (flat) + Prettier + vitest (with SWC for Nest
+- [x] Tooling: ESLint (flat) + Prettier + vitest (with SWC for Nest
       decorators) + lint-staged/husky + commitlint
-- [ ] Infra: `docker-compose.yml` with Postgres 16, Redis 7, Elasticsearch 8
+- [x] Infra: `docker-compose.yml` with Postgres 16, Redis 7, Elasticsearch 8
       (single node, security off); `.env.example`
-- [ ] CI: GH Actions — lint, typecheck, unit tests, integration tests against
+- [x] CI: GH Actions — lint, typecheck, unit tests, integration tests against
       the compose services, build, on every push/PR
-- [ ] Domain core (`packages/domain`, pure TS, strict TDD, zero framework imports):
-  - [ ] types: `VehicleVariant`, `Part`, `Fitment`, `RegistrationKey`, `FitResult`, `ImportRow`
-  - [ ] `yearMonth`: validation, comparison, window containment
-  - [ ] `vehicleKey`: parse + normalise a registration key; resolve candidates; disambiguation labels
-  - [ ] `fit`: `evaluateFit` with the restriction order and exact reason strings
-  - [ ] `searchQuery`: `buildSearchQuery` emitting the Elasticsearch body (nested fitment filter, universal short-circuit, facets, boosts, sorts, paging)
-  - [ ] `orders`: line and order totals in cents, canonical JSON, idempotency key validation, reservation expiry
-  - [ ] `importRows`: row validation without zod, chunk range computation
+- [x] Domain core (`packages/domain`, pure TS, strict TDD, zero framework imports):
+  - [x] types: `VehicleVariant`, `Part`, `Fitment`, `RegistrationKey`, `FitResult`, `ImportRow`
+  - [x] `yearMonth`: validation, comparison, window containment
+  - [x] `vehicleKey`: parse + normalise a registration key; resolve candidates; disambiguation labels
+  - [x] `fit`: `evaluateFit` with the restriction order and exact reason strings
+  - [x] `searchQuery`: `buildSearchQuery` emitting the Elasticsearch body (nested fitment filter, universal short-circuit, facets, boosts, sorts, paging)
+  - [x] `orders`: line and order totals in cents, canonical JSON, idempotency key validation, reservation expiry
+  - [x] `importRows`: row validation without zod, chunk range computation
 - [ ] DB: Drizzle schema + migrations (`vehicle_variants`, `categories`,
       `suppliers`, `parts`, `fitments`, `imports`, `import_chunks`, `orders`,
       `order_lines`, `stock_reservations`); deterministic generator with
