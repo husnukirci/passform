@@ -23,6 +23,6 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", ".tsout", ".next/types/**/*.d.ts"],
+  "exclude": ["node_modules", ".tsout"],
   "references": [{ "path": "../../packages/contracts" }]
 }
