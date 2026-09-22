@@ -66,13 +66,13 @@ rules are pure functions over plain data.
 
 ### Tier 1 — v1 release
 
-- [ ] Scaffold: npm workspaces; `apps/api` (NestJS), `apps/web` (Next.js App
+- [x] Scaffold: npm workspaces; `apps/api` (NestJS), `apps/web` (Next.js App
       Router), `packages/domain`, `packages/contracts`; TS strict; Tailwind v4
-- [ ] Tooling: ESLint (flat) + Prettier + vitest (with SWC for Nest
+- [x] Tooling: ESLint (flat) + Prettier + vitest (with SWC for Nest
       decorators) + lint-staged/husky + commitlint
-- [ ] Infra: `docker-compose.yml` with Postgres 16, Redis 7, Elasticsearch 8
+- [x] Infra: `docker-compose.yml` with Postgres 16, Redis 7, Elasticsearch 8
       (single node, security off); `.env.example`
-- [ ] CI: GH Actions — lint, typecheck, unit tests, integration tests against
+- [x] CI: GH Actions — lint, typecheck, unit tests, integration tests against
       the compose services, build, on every push/PR
 - [x] Domain core (`packages/domain`, pure TS, strict TDD, zero framework imports):
   - [x] types: `VehicleVariant`, `Part`, `Fitment`, `RegistrationKey`, `FitResult`, `ImportRow`
