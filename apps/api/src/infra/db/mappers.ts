@@ -6,12 +6,15 @@ import type { Fitment, Part, VehicleVariant } from "@passform/domain";
 
 import { type fitments, type parts, type vehicleVariants } from "./schema.js";
 
+/** Every column present, nullable ones as `null`: a mapped row never falls back to a column default. */
+type Explicit<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
+
 export type VariantRow = typeof vehicleVariants.$inferSelect;
-export type VariantInsert = typeof vehicleVariants.$inferInsert;
+export type VariantInsert = Explicit<typeof vehicleVariants.$inferInsert>;
 export type PartRow = typeof parts.$inferSelect;
-export type PartInsert = typeof parts.$inferInsert;
+export type PartInsert = Explicit<typeof parts.$inferInsert>;
 export type FitmentRow = typeof fitments.$inferSelect;
-export type FitmentInsert = typeof fitments.$inferInsert;
+export type FitmentInsert = Explicit<Omit<typeof fitments.$inferInsert, "id">>;
 
 export function rowToVariant(row: VariantRow): VehicleVariant {
   return {
