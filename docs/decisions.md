@@ -89,6 +89,55 @@ design; the `ask` result is the only softness, and it is a verdict with a
 named equipment code, not a lower score. Filter clauses are cached by
 Elasticsearch, which also makes this the cheaper shape.
 
+## ADR 5: Fitments as nested documents on the part
+
+**Context.** A part fits several variants, each with its own optional
+build window, axle and equipment restriction. Search must match one row's
+variant and window together: a part that fits variant A from 2012-01 and
+variant B from 2014-06 must not match a 2013 A-variant through B's window.
+A flat array of fitment fields loses that pairing. Universal parts fit
+every vehicle and carry no rows at all.
+
+**Decision.** One document per part with `fitments` mapped as `nested`; the
+domain query runs a `nested` filter over the rows and `or`s it with
+`universal: true`. Build dates are `date` fields with format `yyyy-MM`, the
+same strings the domain emits. `_source` excludes `fitments` from hits and
+`inner_hits` carries only the rows that matched, which is what per-hit fit
+evaluation needs. The `_id` is the part id; the body mirrors the mapping
+field for field through one `partToDocument` function.
+
+**Consequences.** Each fitment row is a hidden Lucene document, so the
+physical index is roughly ten times larger than the part count (62,204
+documents for 5,000 parts in the small profile) and a part with many
+fitments makes a large document; the rebuild logs the largest array seen.
+Nested queries are slower than flat term filters, accepted because they are
+correct. Changing a fitment means reindexing its whole part, which is why
+fitment changes take the rebuild path (ADR 11).
+
+## ADR 6: Postgres is the source of truth; Elasticsearch is derived and rebuilt behind an alias
+
+**Context.** Search needs an inverted index; orders and imports need
+transactions. Keeping two stores in step by dual-writing invites drift with
+no way to tell which side is right. An index rebuild that replaces documents
+in place would also leave search answering from a half-written index.
+
+**Decision.** Postgres holds every fact. Elasticsearch is a rebuildable
+projection of it: `rebuildIndex` writes a new physical index
+`parts_v<unix-ms>`, refreshes it, compares its document count with `select
+count(*) from parts`, and only on a match moves the `parts` alias in one
+atomic `updateAliases` call and deletes the previous index. On a mismatch it
+deletes the new index and throws `IndexVerificationError` with both numbers;
+the alias never moves. The API reads only the alias; physical names appear
+in `alias.ts` and nowhere else.
+
+**Consequences.** Search keeps answering from the previous index for the
+whole rebuild, and a broken rebuild is invisible to readers. Two copies of
+the index exist briefly, so disk is sized for that. The count check catches
+lost or duplicated documents but not stale field values; a per-document
+checksum is a possible follow-up. Anything the index needs (category path,
+stock flag) is derived at build time from Postgres, so a schema change on
+the Postgres side is a rebuild, never a migration of the index.
+
 ## ADR 7: Deterministic generator with size profiles; all names invented
 
 **Context.** The project needs a catalogue large enough to make index
@@ -119,6 +168,28 @@ equipment, 5% universal parts, 8% out of stock) rather than realistic, and
 changing any rule or name changes every id after it, which is acceptable
 because nothing outside the generated files refers to them. The name file
 is the single place the name scrub has to audit.
+
+## ADR 11: Slow and fast index paths
+
+**Context.** Catalogue and fitment changes arrive as supplier files and
+touch many parts at once, and a fitment change reshapes a whole nested
+document (ADR 5). Price and stock change constantly, one part at a time,
+and are flat fields on the document.
+
+**Decision.** Two paths. The slow path is the full rebuild of ADR 6: it is
+the only way catalogue and fitment changes reach the index, and the import
+pipeline triggers it once a file has been processed. The fast path is a
+partial document update to the live alias for `price_cents` and `in_stock`
+only; it never touches `fitments`. Tier 1 ships the slow path; the fast
+path is a Tier 2 follow-up and until then price and stock changes also wait
+for the next rebuild.
+
+**Consequences.** Fitment correctness never depends on an incremental
+update getting the nested array right. Search shows stale prices and stock
+for the length of a rebuild until the fast path lands, which the order flow
+tolerates because stock is reserved in Postgres, not in the index. The
+rebuild's cost, measured in `docs/numbers.md`, bounds how often the slow
+path can run.
 
 ## ADR 12: Local-first infrastructure; deployment deferred to Tier 3
 
