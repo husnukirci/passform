@@ -10,7 +10,7 @@ import { parseArgs } from "node:util";
 import { CATEGORIES } from "./categories.js";
 import { JsonlWriter } from "./jsonl.js";
 import { SUPPLIERS } from "./names.js";
-import { dataDir } from "./paths.js";
+import { dataDir, userPath } from "./paths.js";
 import { Rng } from "./prng.js";
 import {
   indexVariants,
@@ -82,7 +82,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   if (!isProfileName(values.profile)) {
     throw new Error(`--profile: expected small or large, got "${values.profile}"`);
   }
-  const out = values.out ?? join(dataDir(), values.profile);
+  const out = values.out ? userPath(values.out) : join(dataDir(), values.profile);
 
   const started = performance.now();
   const result = await generateDataset({ profile: values.profile, out });

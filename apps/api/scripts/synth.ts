@@ -217,9 +217,14 @@ function synthEquipment(rng: Rng): string[] {
 // --- parts ------------------------------------------------------------------
 
 /** What the part synthesiser needs to know about the variants already generated. */
+export interface VariantWindow {
+  from: number;
+  to: number | null;
+}
+
 export interface VariantIndex {
   /** Build window per variant, by 0-based position (id `v_000001` is position 0). */
-  windows: { from: number; to: number | null }[];
+  windows: VariantWindow[];
   /** [start, end) positions per make, in MAKES order. */
   makeRanges: [number, number][];
 }
@@ -368,25 +373,32 @@ export function synthFitments(
 }
 
 function synthFitment(rng: Rng, pos: number, index: VariantIndex, partAxle: Axle | null): Fitment {
-  const window = index.windows[pos];
-  if (!window) throw new Error(`no variant at position ${pos}`);
+  const variantWindow = index.windows[pos];
+  if (!variantWindow) throw new Error(`no variant at position ${pos}`);
 
-  let buildFrom: YearMonth | null = null;
-  let buildTo: YearMonth | null = null;
-  if (rng.chance(FITMENT_WINDOW_RATE)) {
-    const end = Math.min(window.to ?? window.from + OPEN_WINDOW_MONTHS, LAST_MONTH);
-    const span = Math.max(end, window.from) - window.from;
-    const fromOffset = rng.int(0, span);
-    const toOffset = rng.int(fromOffset, span);
-    buildFrom = yearMonthAt(window.from + fromOffset);
-    buildTo = yearMonthAt(window.from + toOffset);
-  }
+  const window = rng.chance(FITMENT_WINDOW_RATE)
+    ? synthWindow(rng, variantWindow)
+    : { buildFrom: null, buildTo: null };
 
   return {
     variantId: variantId(pos + 1),
-    buildFrom,
-    buildTo,
+    ...window,
     axle: partAxle !== null && rng.chance(FITMENT_AXLE_RATE) ? partAxle : null,
     equipmentCode: rng.chance(FITMENT_EQUIPMENT_RATE) ? rng.pick(EQUIPMENT_CODES) : null,
+  };
+}
+
+/** A closed build window that lies inside the variant's own window. */
+export function synthWindow(
+  rng: Rng,
+  variantWindow: VariantWindow,
+): { buildFrom: YearMonth; buildTo: YearMonth } {
+  const end = Math.min(variantWindow.to ?? variantWindow.from + OPEN_WINDOW_MONTHS, LAST_MONTH);
+  const span = Math.max(end, variantWindow.from) - variantWindow.from;
+  const fromOffset = rng.int(0, span);
+  const toOffset = rng.int(fromOffset, span);
+  return {
+    buildFrom: yearMonthAt(variantWindow.from + fromOffset),
+    buildTo: yearMonthAt(variantWindow.from + toOffset),
   };
 }

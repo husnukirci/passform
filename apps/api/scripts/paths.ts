@@ -11,3 +11,12 @@ export const MIGRATIONS_FOLDER = resolve(API_ROOT, "drizzle");
 export function dataDir(): string {
   return resolve(REPO_ROOT, process.env.DATA_DIR ?? "./.data");
 }
+
+/**
+ * A path typed on the command line, resolved against the directory npm was
+ * invoked from (`INIT_CWD`) rather than the workspace, so
+ * `npm run db:seed -- --from .data/large` at the repo root does what it says.
+ */
+export function userPath(path: string): string {
+  return resolve(process.env.INIT_CWD ?? process.cwd(), path);
+}

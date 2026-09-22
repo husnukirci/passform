@@ -24,7 +24,7 @@ import type { Category } from "./categories.js";
 import { chunked, csvLine, pgTextArray } from "./csv.js";
 import { readJsonl } from "./jsonl.js";
 import type { Supplier } from "./names.js";
-import { dataDir } from "./paths.js";
+import { dataDir, userPath } from "./paths.js";
 import type { PartLine } from "./synth.js";
 
 export interface SeedOptions {
@@ -196,7 +196,7 @@ class StepTimer {
 
 if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const { values } = parseArgs({ options: { from: { type: "string" } } });
-  const from = values.from ?? join(dataDir(), "small");
+  const from = values.from ? userPath(values.from) : join(dataDir(), "small");
 
   const started = performance.now();
   const result = await seedDatabase({ from, log: (message) => console.log(`  ${message}`) });
