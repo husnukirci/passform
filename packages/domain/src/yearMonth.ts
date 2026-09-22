@@ -1,4 +1,4 @@
-import { DomainError, type YearMonth } from "./types.js";
+import { DomainError, type YearMonth } from "./types.ts";
 
 const YEAR_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 

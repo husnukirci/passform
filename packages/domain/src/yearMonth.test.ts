@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { DomainError } from "./types.js";
-import { compareYearMonth, isYearMonth, withinWindow } from "./yearMonth.js";
+import { DomainError } from "./types.ts";
+import { compareYearMonth, isYearMonth, withinWindow } from "./yearMonth.ts";
 
 describe("isYearMonth", () => {
   it.each(["2012-08", "1999-01", "2030-12"])("accepts %s", (value) => {

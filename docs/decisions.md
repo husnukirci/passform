@@ -227,3 +227,12 @@ Node's type stripping is the load-bearing runtime feature, so the Node
 version floor is 22.18 and the packages are restricted to plain
 TypeScript. Root `tsc -b` still emits declarations, into gitignored
 directories, only because project references require an emit.
+
+_Amended in Phase 4._ Node strips types but does not rewrite specifiers,
+so a `./types.js` import inside a package fails at runtime because no
+`types.js` exists. Relative imports inside the packages therefore use the
+`.ts` extension, and `rewriteRelativeImportExtensions` in
+`tsconfig.base.json` lets TypeScript accept them and rewrite them in any
+emitted output. This was found when the running API first imported the
+domain package; the Phase 2 scripts had sidestepped it by running under
+`tsx`.

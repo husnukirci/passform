@@ -1,4 +1,4 @@
-import { DomainError, type OrderLineInput } from "./types.js";
+import { DomainError, type OrderLineInput } from "./types.ts";
 
 export const RESERVATION_TTL_MINUTES = 15;
 

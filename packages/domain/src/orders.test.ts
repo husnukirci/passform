@@ -7,8 +7,8 @@ import {
   orderTotalCents,
   RESERVATION_TTL_MINUTES,
   reservationExpiresAt,
-} from "./orders.js";
-import { DomainError } from "./types.js";
+} from "./orders.ts";
+import { DomainError } from "./types.ts";
 
 describe("lineTotalCents", () => {
   it("multiplies quantity by unit price", () => {

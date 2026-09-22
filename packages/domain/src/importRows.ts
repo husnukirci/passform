@@ -1,5 +1,5 @@
-import { type Axle, type BrandTier, DomainError, type Fitment } from "./types.js";
-import { isYearMonth } from "./yearMonth.js";
+import { type Axle, type BrandTier, DomainError, type Fitment } from "./types.ts";
+import { isYearMonth } from "./yearMonth.ts";
 
 export interface ImportRow {
   sku: string;

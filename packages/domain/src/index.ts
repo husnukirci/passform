@@ -12,17 +12,17 @@ export type {
   RegistrationKey,
   VehicleVariant,
   YearMonth,
-} from "./types.js";
-export { DomainError } from "./types.js";
+} from "./types.ts";
+export { DomainError } from "./types.ts";
 
-export { compareYearMonth, isYearMonth, withinWindow } from "./yearMonth.js";
+export { compareYearMonth, isYearMonth, withinWindow } from "./yearMonth.ts";
 
-export { parseRegistrationKey, resolveVariants, variantLabel } from "./vehicleKey.js";
+export { parseRegistrationKey, resolveVariants, variantLabel } from "./vehicleKey.ts";
 
-export { evaluateFit } from "./fit.js";
+export { evaluateFit } from "./fit.ts";
 
-export type { SearchBody, SearchInput, SearchSort } from "./searchQuery.js";
-export { BOOSTS, buildSearchQuery, PAGE_SIZE } from "./searchQuery.js";
+export type { SearchBody, SearchInput, SearchSort } from "./searchQuery.ts";
+export { BOOSTS, buildSearchQuery, PAGE_SIZE } from "./searchQuery.ts";
 
 export {
   canonicalJson,
@@ -31,7 +31,7 @@ export {
   orderTotalCents,
   RESERVATION_TTL_MINUTES,
   reservationExpiresAt,
-} from "./orders.js";
+} from "./orders.ts";
 
-export type { ChunkRange, ImportRow, RowValidation } from "./importRows.js";
-export { CHUNK_SIZE, chunkRanges, validateImportRow } from "./importRows.js";
+export type { ChunkRange, ImportRow, RowValidation } from "./importRows.ts";
+export { CHUNK_SIZE, chunkRanges, validateImportRow } from "./importRows.ts";

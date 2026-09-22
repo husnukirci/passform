@@ -1,4 +1,4 @@
-import { type Axle, DomainError, type VehicleVariant } from "./types.js";
+import { type Axle, DomainError, type VehicleVariant } from "./types.ts";
 
 export type SearchSort = "default" | "price_asc" | "price_desc";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DomainError } from "./types.js";
+import { DomainError } from "./types.ts";
 
 describe("DomainError", () => {
   it("is an Error named DomainError that keeps its message", () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluateFit } from "./fit.js";
-import type { Fitment, VehicleVariant } from "./types.js";
+import { evaluateFit } from "./fit.ts";
+import type { Fitment, VehicleVariant } from "./types.ts";
 
 /** Freeze fixtures all the way down so any mutation throws under ESM strict mode. */
 function deepFreeze<T>(value: T): T {
