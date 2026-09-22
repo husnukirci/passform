@@ -93,6 +93,18 @@ describe("generate small then seed", () => {
     await seedDatabase({ from: dir });
     expect(await count("parts")).toBe(5000);
   });
+
+  it("clears orders along with the catalogue they refer to", async () => {
+    await db.insert(orders).values({
+      id: "o_reseed",
+      idempotencyKey: "0f2c8b6a-2222-4222-8333-444455556666",
+      payloadHash: "abc",
+      status: "placed",
+      totalCents: 100,
+    });
+    await seedDatabase({ from: dir });
+    expect(await count("orders")).toBe(0);
+  });
 });
 
 describe("constraints", () => {

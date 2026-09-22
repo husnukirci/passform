@@ -53,8 +53,10 @@ export async function seedDatabase({
     await client.query("BEGIN");
 
     // Orders and imports hang off the catalogue, so a reseed clears them too.
+    // CASCADE only reaches tables that reference the listed ones; `orders`
+    // is referenced, not referencing, so it is named explicitly.
     await db.execute(
-      sql`TRUNCATE ${schema.fitments}, ${schema.parts}, ${schema.vehicleVariants}, ${schema.categories}, ${schema.suppliers} RESTART IDENTITY CASCADE`,
+      sql`TRUNCATE ${schema.fitments}, ${schema.parts}, ${schema.vehicleVariants}, ${schema.categories}, ${schema.suppliers}, ${schema.orders}, ${schema.imports} RESTART IDENTITY CASCADE`,
     );
 
     const categoryList = JSON.parse(
