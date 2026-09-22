@@ -9,9 +9,9 @@ const OTHER_KEY = { manufacturer: "0588", type: "AKY" };
 function variant(overrides: Partial<VehicleVariant>): VehicleVariant {
   return {
     id: "v_000001",
-    make: "Veltra",
+    make: "Aldervane",
     model: "Corvin",
-    engineCode: "VT14D",
+    engineCode: "AV14D",
     kw: 85,
     fuel: "diesel",
     buildFrom: "2012-08",
@@ -105,12 +105,12 @@ describe("resolveVariants", () => {
 
 describe("variantLabel", () => {
   it("formats engine, power, fuel and build window", () => {
-    expect(variantLabel(variant({}))).toBe("VT14D · 85 kW · diesel · 2012-08 → 2018-06");
+    expect(variantLabel(variant({}))).toBe("AV14D · 85 kW · diesel · 2012-08 → 2018-06");
   });
 
   it("prints 'today' for an open build window", () => {
     expect(variantLabel(variant({ buildTo: null }))).toBe(
-      "VT14D · 85 kW · diesel · 2012-08 → today",
+      "AV14D · 85 kW · diesel · 2012-08 → today",
     );
   });
 });

@@ -5,9 +5,9 @@ import { DomainError, type VehicleVariant } from "./types.js";
 
 const VARIANT: VehicleVariant = {
   id: "v_000001",
-  make: "Veltra",
+  make: "Aldervane",
   model: "Corvin",
-  engineCode: "VT14D",
+  engineCode: "AV14D",
   kw: 85,
   fuel: "diesel",
   buildFrom: "2012-08",
@@ -83,7 +83,7 @@ describe("buildSearchQuery", () => {
     const body = buildSearchQuery({
       ...MINIMAL,
       categorySlug: "brakes/discs",
-      brand: "Ferrostat",
+      brand: "Ostrafen",
       q: "front disc",
     });
 
@@ -92,7 +92,7 @@ describe("buildSearchQuery", () => {
         filter: [
           fitmentFilter(VARIANT),
           { term: { category_path: "brakes/discs" } },
-          { term: { brand: "Ferrostat" } },
+          { term: { brand: "Ostrafen" } },
           { multi_match: { query: "front disc", fields: ["name", "sku", "oe_ref", "brand"] } },
         ],
         should: RANKING,
@@ -176,7 +176,7 @@ describe("buildSearchQuery", () => {
     const inputs: SearchInput[] = [
       MINIMAL,
       { ...MINIMAL, variant: WITH_EQUIPMENT, axle: "rear" },
-      { ...MINIMAL, q: "x", brand: "Ferrostat", categorySlug: "brakes", sort: "price_desc" },
+      { ...MINIMAL, q: "x", brand: "Ostrafen", categorySlug: "brakes", sort: "price_desc" },
     ];
 
     for (const input of inputs) {

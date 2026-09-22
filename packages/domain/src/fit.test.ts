@@ -14,9 +14,9 @@ function deepFreeze<T>(value: T): T {
 
 const VARIANT: VehicleVariant = deepFreeze({
   id: "v_000001",
-  make: "Veltra",
+  make: "Aldervane",
   model: "Corvin",
-  engineCode: "VT14D",
+  engineCode: "AV14D",
   kw: 85,
   fuel: "diesel",
   buildFrom: "2012-08",
@@ -57,13 +57,13 @@ describe("evaluateFit: fits", () => {
   it("names the vehicle and its build window", () => {
     expect(evaluateFit(VARIANT, PART, [row()], null)).toEqual({
       result: "fits",
-      reason: "Fits Veltra Corvin VT14D (2012-08 → 2018-06)",
+      reason: "Fits Aldervane Corvin AV14D (2012-08 → 2018-06)",
     });
   });
 
   it("prints 'today' for an open build window", () => {
     expect(evaluateFit(OPEN_ENDED, PART, [row()], null).reason).toBe(
-      "Fits Veltra Corvin VT14D (2012-08 → today)",
+      "Fits Aldervane Corvin AV14D (2012-08 → today)",
     );
   });
 
@@ -75,14 +75,14 @@ describe("evaluateFit: fits", () => {
 
   it("appends the axle when the winning row has one and it was chosen", () => {
     expect(evaluateFit(VARIANT, PART, [row({ axle: "front" })], "front").reason).toBe(
-      "Fits Veltra Corvin VT14D (2012-08 → 2018-06) on the front axle",
+      "Fits Aldervane Corvin AV14D (2012-08 → 2018-06) on the front axle",
     );
   });
 
   it("shows both axles when no axle was chosen", () => {
     expect(evaluateFit(VARIANT, PART, [row({ axle: "rear" })], null)).toEqual({
       result: "fits",
-      reason: "Fits Veltra Corvin VT14D (2012-08 → 2018-06) on the rear axle",
+      reason: "Fits Aldervane Corvin AV14D (2012-08 → 2018-06) on the rear axle",
     });
   });
 
@@ -192,7 +192,7 @@ describe("evaluateFit: several rows", () => {
     const rows = [row({ axle: "rear" }), row({ axle: "front" })];
 
     expect(evaluateFit(VARIANT, PART, rows, null).reason).toBe(
-      "Fits Veltra Corvin VT14D (2012-08 → 2018-06) on the rear axle",
+      "Fits Aldervane Corvin AV14D (2012-08 → 2018-06) on the rear axle",
     );
   });
 });

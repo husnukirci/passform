@@ -5,11 +5,11 @@ import { DomainError } from "./types.js";
 
 const VALID = {
   sku: "BRK-0001",
-  brand: "Ferrostat",
+  brand: "Ostrafen",
   brandTier: "premium",
   categorySlug: "brakes/discs",
   name: "Brake disc, vented, 280 mm",
-  oeRef: "VT-33-2810",
+  oeRef: "AV-33-2810",
   attributes: { diameterMm: 280, position: "front" },
   priceCents: 4599,
   stockQty: 12,
