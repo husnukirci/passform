@@ -15,9 +15,11 @@
     "db:generate-migration": "drizzle-kit generate",
     "data:generate": "tsx scripts/generate.ts",
     "data:generate-import": "tsx scripts/generate-import.ts",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "index:rebuild": "tsx scripts/index-rebuild.ts"
   },
   "dependencies": {
+    "@elastic/elasticsearch": "^8.19.2",
     "@nestjs/common": "^11.1.0",
     "@nestjs/core": "^11.1.0",
     "@nestjs/platform-express": "^11.1.0",

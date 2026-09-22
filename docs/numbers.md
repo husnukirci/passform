@@ -47,3 +47,29 @@ Notes:
   and the simple version is easier to read.
 - Import files: `npm run data:generate-import -- --rows 500000 --from
 .data/small` writes 500,000 rows (676 MB) in 3.3 s.
+
+## Phase 3: index rebuild
+
+Elasticsearch 8.19 in the same Docker, single node, 1 GB heap
+(`ES_JAVA_OPTS=-Xms1g -Xmx1g`), one shard, no replicas, refreshes off during
+the load. Command: `npm run index:rebuild` against the `large` database.
+
+| Figure                                 |       Value |
+| -------------------------------------- | ----------: |
+| Documents (one per part)               |   2,000,000 |
+| Nested fitment rows inside them        |  22,799,879 |
+| Lucene documents (parts + nested rows) |  24,799,879 |
+| Largest `fitments` array on one part   |          20 |
+| Index size on disk                     |      1.6 GB |
+| **Rebuild wall-clock, create to swap** | **124.8 s** |
+| Parts indexed per second               |      16,000 |
+
+Notes:
+
+- Parts stream from Postgres in batches of 5,000 by keyset on `id`, with
+  one fitments query per batch; documents go to Elasticsearch in bulk
+  requests of 2,000. Nothing beyond one batch is held in memory.
+- The time includes the refresh, the count verification against
+  `select count(*) from parts` and the alias swap. The old index is deleted
+  after the swap, so two copies exist for the length of a rebuild.
+- The small profile (5,000 parts, 57,204 fitment rows) rebuilds in 0.6 s.

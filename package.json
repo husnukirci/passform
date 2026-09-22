@@ -25,7 +25,8 @@
     "data:generate": "dotenv -- npm run data:generate -w apps/api --",
     "data:generate-import": "dotenv -- npm run data:generate-import -w apps/api --",
     "db:seed": "dotenv -- npm run db:seed -w apps/api --",
-    "db:setup": "npm run db:migrate && npm run data:generate && npm run db:seed && echo 'db:setup: index:rebuild arrives in phase 3; stopping after seed.'"
+    "db:setup": "npm run db:migrate && npm run data:generate && npm run db:seed && npm run index:rebuild",
+    "index:rebuild": "dotenv -- npm run index:rebuild -w apps/api --"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
