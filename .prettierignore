@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.next/
+.tsout/
+.data/
+package-lock.json
+next-env.d.ts
+*.tsbuildinfo
+
+# Approved planning documents are not reformatted.
+CLAUDE.md
+PLAN.md
+PHASES.md
+docs/superpowers/
