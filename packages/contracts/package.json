@@ -1,0 +1,15 @@
+{
+  "name": "@passform/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "zod schemas for every passform request and response body. One definition, no drift.",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}
