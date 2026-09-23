@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { CHUNK_SIZE, chunkRanges, validateImportRow } from "./importRows.js";
-import { DomainError } from "./types.js";
+import { CHUNK_SIZE, chunkRanges, validateImportRow } from "./importRows.ts";
+import { DomainError } from "./types.ts";
 
 const VALID = {
   sku: "BRK-0001",

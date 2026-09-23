@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BOOSTS, buildSearchQuery, PAGE_SIZE, type SearchInput } from "./searchQuery.js";
-import { DomainError, type VehicleVariant } from "./types.js";
+import { BOOSTS, buildSearchQuery, PAGE_SIZE, type SearchInput } from "./searchQuery.ts";
+import { DomainError, type VehicleVariant } from "./types.ts";
 
 const VARIANT: VehicleVariant = {
   id: "v_000001",

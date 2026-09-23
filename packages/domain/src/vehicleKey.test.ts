@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { DomainError, type VehicleVariant } from "./types.js";
-import { parseRegistrationKey, resolveVariants, variantLabel } from "./vehicleKey.js";
+import { DomainError, type VehicleVariant } from "./types.ts";
+import { parseRegistrationKey, resolveVariants, variantLabel } from "./vehicleKey.ts";
 
 const KEY = { manufacturer: "0588", type: "AKX" };
 const OTHER_KEY = { manufacturer: "0588", type: "AKY" };

@@ -60,4 +60,5 @@ The build is tiered and phased so the project is releasable at every
 milestone. See [PLAN.md](PLAN.md) for the tiers and [PHASES.md](PHASES.md)
 for the per-phase specs. Decisions are recorded in
 [docs/decisions.md](docs/decisions.md) and the AI-assisted workflow in
-[docs/ai-workflow.md](docs/ai-workflow.md).
+[docs/ai-workflow.md](docs/ai-workflow.md). The REST contract is documented
+endpoint by endpoint, with examples that were run, in [docs/api.md](docs/api.md).

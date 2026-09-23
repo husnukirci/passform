@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { HealthResponse } from "./index.js";
+import { HealthResponse } from "./health.ts";
 
 describe("HealthResponse", () => {
   it("accepts { ok: true }", () => {

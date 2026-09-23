@@ -71,7 +71,13 @@ export default defineConfig([
 
   {
     files: ["apps/api/**/*.ts"],
-    languageOptions: { globals: globals.node },
+    languageOptions: {
+      globals: globals.node,
+      // Nest resolves constructor and handler parameters from decorator
+      // metadata, so a class used only as a parameter type must stay a value
+      // import; these flags tell consistent-type-imports about it.
+      parserOptions: { experimentalDecorators: true, emitDecoratorMetadata: true },
+    },
     rules: {
       // Nest modules are empty classes that exist for their decorator.
       "@typescript-eslint/no-extraneous-class": ["error", { allowWithDecorator: true }],

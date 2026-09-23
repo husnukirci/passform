@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import * as domain from "./index.js";
+import * as domain from "./index.ts";
 
 describe("domain package public surface", () => {
   it("exports every rule module's functions and constants", () => {

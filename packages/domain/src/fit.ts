@@ -1,5 +1,5 @@
-import type { Axle, FitResult, Fitment, Part, VehicleVariant } from "./types.js";
-import { withinWindow } from "./yearMonth.js";
+import type { Axle, FitResult, Fitment, Part, VehicleVariant } from "./types.ts";
+import { withinWindow } from "./yearMonth.ts";
 
 /**
  * How far a row got through the restriction order before it failed. A

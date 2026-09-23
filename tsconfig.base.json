@@ -13,6 +13,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
+    "rewriteRelativeImportExtensions": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "composite": true,

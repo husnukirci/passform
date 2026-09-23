@@ -1,0 +1,506 @@
+# REST API
+
+The read side of the contract (Tier 1, Phase 4). Base URL in development:
+`http://localhost:4000`. Every body is JSON; every schema lives in
+`packages/contracts` and is the same definition the web app parses
+responses with (ADR 13). Ids are strings, money is integer cents, build
+dates are `YYYY-MM`. All examples below were run against the `small`
+profile; the data is synthetic and every name is invented.
+
+Imports (`POST /imports`, `GET /imports/:id`) arrive in Phase 5, orders in
+Phase 6.
+
+## Errors
+
+Every non-2xx response is an `ErrorResponse`:
+
+| Field        | Type                                  | Notes                                     |
+| ------------ | ------------------------------------- | ----------------------------------------- |
+| `statusCode` | integer                               | Same as the HTTP status                   |
+| `message`    | string                                | Human-readable, names the field or the id |
+| `issues`     | `{ path: string, message: string }[]` | Only on validation failures (`400`)       |
+
+- `400` — a query parameter failed its schema (`message: "Validation
+failed"`, one issue per field) or a domain rule (for example a malformed
+  registration key; the message names the field).
+- `404` — an unknown variant id or part SKU.
+- `500` — `message: "Internal server error"`; details stay in the API log.
+
+```sh
+curl 'localhost:4000/search?variantId=v_000001&page=0'
+```
+
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed",
+  "issues": [{ "path": "page", "message": "Too small: expected number to be >=1" }]
+}
+```
+
+## Vehicles
+
+### `GET /vehicles/resolve?manufacturer=&type=`
+
+Resolves a two-part registration key. The key is trimmed and uppercased
+before validation: `manufacturer` must be exactly four digits, `type`
+exactly three characters `A–Z0–9`. One key may map to several variants;
+that is normal, and the client asks the customer rather than guessing.
+
+| Field                 | Type                  | Notes                                            |
+| --------------------- | --------------------- | ------------------------------------------------ |
+| `variants`            | `VehicleVariantDto[]` | Oldest build first, then by power. Empty is fine |
+| `needsDisambiguation` | boolean               | `true` when more than one variant matched        |
+
+`VehicleVariantDto`:
+
+| Field        | Type                                           | Notes                                                       |
+| ------------ | ---------------------------------------------- | ----------------------------------------------------------- |
+| `id`         | string                                         | `v_000001`                                                  |
+| `make`       | string                                         |                                                             |
+| `model`      | string                                         |                                                             |
+| `engineCode` | string                                         |                                                             |
+| `kw`         | integer                                        |                                                             |
+| `fuel`       | `petrol` \| `diesel` \| `hybrid` \| `electric` |                                                             |
+| `buildFrom`  | `YYYY-MM`                                      |                                                             |
+| `buildTo`    | `YYYY-MM` \| null                              | `null` while still in production                            |
+| `equipment`  | string[]                                       | Empty means the record does not say; fit then answers `ask` |
+| `key`        | `{ manufacturer, type }`                       |                                                             |
+| `label`      | string                                         | The line to show when disambiguating                        |
+
+Errors: `400` for a malformed key.
+
+```sh
+curl 'localhost:4000/vehicles/resolve?manufacturer=1103&type=003'
+```
+
+```json
+{
+  "variants": [
+    {
+      "id": "v_000003",
+      "make": "Varenta",
+      "model": "Ivane",
+      "engineCode": "D16-170",
+      "kw": 170,
+      "fuel": "diesel",
+      "buildFrom": "2004-09",
+      "buildTo": "2012-01",
+      "equipment": ["AC", "AWD"],
+      "key": { "manufacturer": "1103", "type": "003" },
+      "label": "D16-170 · 170 kW · diesel · 2004-09 → 2012-01"
+    },
+    {
+      "id": "v_000004",
+      "make": "Varenta",
+      "model": "Ivane",
+      "engineCode": "P12-110",
+      "kw": 110,
+      "fuel": "petrol",
+      "buildFrom": "2016-08",
+      "buildTo": "2023-10",
+      "equipment": ["BRK-L", "SUS-S", "AC", "AWD"],
+      "key": { "manufacturer": "1103", "type": "003" },
+      "label": "P12-110 · 110 kW · petrol · 2016-08 → 2023-10"
+    }
+  ],
+  "needsDisambiguation": true
+}
+```
+
+```sh
+curl 'localhost:4000/vehicles/resolve?manufacturer=12&type=003'
+```
+
+```json
+{ "statusCode": 400, "message": "manufacturer: expected exactly 4 digits" }
+```
+
+### `GET /vehicles/makes`
+
+The dropdown fallback, first level. No parameters.
+
+| Field   | Type     | Notes        |
+| ------- | -------- | ------------ |
+| `makes` | string[] | Alphabetical |
+
+```sh
+curl 'localhost:4000/vehicles/makes'
+```
+
+```json
+{
+  "makes": [
+    "Brindmark",
+    "Caldrith",
+    "Halvora",
+    "Kolmberg",
+    "Ludmeyer",
+    "Norvane",
+    "Quennard",
+    "Ristello",
+    "Sorvique",
+    "Tessaro",
+    "Varenta",
+    "Wexmoor"
+  ]
+}
+```
+
+### `GET /vehicles/models?make=`
+
+| Parameter | Required | Notes            |
+| --------- | -------- | ---------------- |
+| `make`    | yes      | Non-empty string |
+
+| Field    | Type     | Notes                                   |
+| -------- | -------- | --------------------------------------- |
+| `make`   | string   | Echoed                                  |
+| `models` | string[] | Alphabetical; empty for an unknown make |
+
+Errors: `400` without `make`.
+
+```sh
+curl 'localhost:4000/vehicles/models?make=Varenta'
+```
+
+```json
+{ "make": "Varenta", "models": ["Ivane", "Kestra", "Lumvaren", "Pavane", "Rilla", "Sarto"] }
+```
+
+### `GET /vehicles?make=&model=`
+
+| Parameter | Required | Notes            |
+| --------- | -------- | ---------------- |
+| `make`    | yes      | Non-empty string |
+| `model`   | yes      | Non-empty string |
+
+| Field      | Type                  | Notes                             |
+| ---------- | --------------------- | --------------------------------- |
+| `variants` | `VehicleVariantDto[]` | Oldest build first, then by power |
+
+Errors: `400` when either parameter is missing.
+
+```sh
+curl 'localhost:4000/vehicles?make=Varenta&model=Ivane'
+```
+
+```json
+{
+  "variants": [
+    {
+      "id": "v_000003",
+      "make": "Varenta",
+      "model": "Ivane",
+      "engineCode": "D16-170",
+      "kw": 170,
+      "fuel": "diesel",
+      "buildFrom": "2004-09",
+      "buildTo": "2012-01",
+      "equipment": ["AC", "AWD"],
+      "key": { "manufacturer": "1103", "type": "003" },
+      "label": "D16-170 · 170 kW · diesel · 2004-09 → 2012-01"
+    }
+  ]
+}
+```
+
+(Trimmed to the first variant.)
+
+### `GET /vehicles/:id`
+
+One `VehicleVariantDto`. Errors: `404` for an unknown id.
+
+```sh
+curl 'localhost:4000/vehicles/v_000001'
+```
+
+```json
+{
+  "id": "v_000001",
+  "make": "Varenta",
+  "model": "Ivane",
+  "engineCode": "P30-66",
+  "kw": 66,
+  "fuel": "petrol",
+  "buildFrom": "2011-08",
+  "buildTo": "2016-02",
+  "equipment": ["BRK-L", "AWD"],
+  "key": { "manufacturer": "1103", "type": "001" },
+  "label": "P30-66 · 66 kW · petrol · 2011-08 → 2016-02"
+}
+```
+
+```sh
+curl 'localhost:4000/vehicles/v_nope'
+```
+
+```json
+{ "statusCode": 404, "message": "vehicle v_nope not found" }
+```
+
+## Categories
+
+### `GET /categories`
+
+The whole tree. No parameters.
+
+| Field        | Type             | Notes                       |
+| ------------ | ---------------- | --------------------------- |
+| `categories` | `CategoryNode[]` | Roots, alphabetical by name |
+
+`CategoryNode`: `{ id: string, name: string, children: CategoryNode[] }`.
+The `id` is the slug (`brakes/pads`) and is what `GET /search?category=`
+takes.
+
+```sh
+curl 'localhost:4000/categories'
+```
+
+```json
+{
+  "categories": [
+    {
+      "id": "body",
+      "name": "Body",
+      "children": [
+        { "id": "body/door-handles", "name": "Door handles", "children": [] },
+        { "id": "body/mirrors", "name": "Mirror glass", "children": [] },
+        { "id": "body/clips", "name": "Trim clips", "children": [] }
+      ]
+    }
+  ]
+}
+```
+
+(Trimmed to the first root.)
+
+## Search
+
+### `GET /search?variantId=&q=&category=&brand=&axle=&sort=&page=`
+
+Constrain, then rank (ADR 4). Fitment is an exact filter: a part is a hit
+only when one of its fitment rows matches the variant, its build month and
+the chosen axle, or the part is universal. Ranking (in stock, then brand
+tier) applies only to the survivors. Page size is fixed at 24.
+
+| Parameter   | Required | Notes                                                                          |
+| ----------- | -------- | ------------------------------------------------------------------------------ |
+| `variantId` | yes      | From `/vehicles/resolve` or `/vehicles`                                        |
+| `q`         | no       | Free text over name, SKU, OE reference and brand                               |
+| `category`  | no       | A category slug; matches the category and everything below it                  |
+| `brand`     | no       | Exact brand name                                                               |
+| `axle`      | no       | `front` \| `rear`; drops rows restricted to the other axle                     |
+| `sort`      | no       | `default` (rank, then price) \| `price_asc` \| `price_desc`; default `default` |
+| `page`      | no       | Integer ≥ 1; default 1                                                         |
+
+| Field           | Type             | Notes                                                   |
+| --------------- | ---------------- | ------------------------------------------------------- |
+| `hits`          | `SearchHitDto[]` | This page                                               |
+| `stages.fitted` | integer          | Parts that passed the fitment filter, before pagination |
+| `stages.shown`  | integer          | `hits.length`                                           |
+| `page`          | integer          | Echoed                                                  |
+| `pageSize`      | integer          | Always 24                                               |
+
+`SearchHitDto` is the part as the index knows it plus a fit verdict:
+
+| Field          | Type                             | Notes                                                         |
+| -------------- | -------------------------------- | ------------------------------------------------------------- |
+| `id`           | string                           | `p_0000001`                                                   |
+| `sku`          | string                           |                                                               |
+| `brand`        | string                           |                                                               |
+| `brandTier`    | `oe` \| `premium` \| `standard`  |                                                               |
+| `categorySlug` | string                           | The leaf                                                      |
+| `name`         | string                           |                                                               |
+| `oeRef`        | string                           |                                                               |
+| `attributes`   | `Record<string, string\|number>` |                                                               |
+| `priceCents`   | integer                          |                                                               |
+| `inStock`      | boolean                          | The index carries the flag, not the quantity; see part detail |
+| `universal`    | boolean                          |                                                               |
+| `fit`          | `FitDto`                         | See below                                                     |
+
+`FitDto` is one of:
+
+- `{ result: "fits", reason }`
+- `{ result: "ask", reason, equipmentCode }` — the row needs an equipment
+  code and the variant record carries none; confirm before ordering
+- `{ result: "no", reason }` — only reachable on the detail endpoint, or in
+  search when `axle` is given and the part's matching rows are for the
+  other axle
+
+Every `reason` is a sentence produced by the domain's `evaluateFit`; the
+badge text and its explanation come from the same place.
+
+Errors: `400` for a missing `variantId`, a bad `axle`, `sort` or `page`;
+`404` for an unknown variant.
+
+```sh
+curl 'localhost:4000/search?variantId=v_000001&sort=price_asc'
+```
+
+```json
+{
+  "hits": [
+    {
+      "id": "p_0001305",
+      "sku": "REM-0001305",
+      "brand": "Rembrix",
+      "brandTier": "standard",
+      "categorySlug": "lighting/bulbs",
+      "name": "Rembrix Bulbs F385",
+      "oeRef": "VAR-12190",
+      "attributes": { "weightG": 4341, "lengthMm": 634 },
+      "priceCents": 570,
+      "universal": true,
+      "inStock": true,
+      "fit": { "result": "fits", "reason": "Universal part, fits every vehicle" }
+    }
+  ],
+  "stages": { "fitted": 273, "shown": 24 },
+  "page": 1,
+  "pageSize": 24
+}
+```
+
+(Trimmed to the first hit.)
+
+```sh
+curl 'localhost:4000/search?variantId=v_000001&category=suspension&axle=front'
+```
+
+```json
+{
+  "hits": [
+    {
+      "id": "p_0002819",
+      "sku": "TRE-0002819",
+      "brand": "Tremosk",
+      "brandTier": "standard",
+      "categorySlug": "suspension/shocks",
+      "name": "Tremosk Shock absorbers J306",
+      "oeRef": "LUD-88961",
+      "attributes": { "axle": "front", "weightG": 10791, "lengthMm": 899 },
+      "priceCents": 6530,
+      "universal": false,
+      "inStock": true,
+      "fit": { "result": "fits", "reason": "Fits Varenta Ivane P30-66 (2011-08 → 2016-02)" }
+    }
+  ],
+  "stages": { "fitted": 2, "shown": 2 },
+  "page": 1,
+  "pageSize": 24
+}
+```
+
+(Trimmed to the first hit.)
+
+## Parts
+
+### `GET /parts/:sku?variantId=`
+
+The part from Postgres with its fitment rows and category path. When
+`variantId` is given, fit is evaluated against that variant with no axle
+chosen, so an axle-restricted row can still answer `fits`.
+
+| Parameter   | Required | Notes                           |
+| ----------- | -------- | ------------------------------- |
+| `variantId` | no       | When present, must be non-empty |
+
+`PartDetailResponse` is `PartDto` plus:
+
+| Field          | Type             | Notes                                         |
+| -------------- | ---------------- | --------------------------------------------- |
+| `categoryPath` | string[]         | Every ancestor slug plus the leaf, root first |
+| `fit`          | `FitDto` \| null | `null` when no `variantId` was given          |
+| `fitments`     | `FitmentDto[]`   | Empty for a universal part                    |
+
+`PartDto` has the search hit's fields with `stockQty` (integer) and
+`supplierId` (string) instead of `inStock`. `FitmentDto` is
+`{ variantId, buildFrom, buildTo, axle, equipmentCode }`, each restriction
+`null` when the row does not carry it.
+
+Errors: `400` for an empty `variantId`; `404` for an unknown SKU or
+variant.
+
+```sh
+curl 'localhost:4000/parts/COR-0000028?variantId=v_000001'
+```
+
+```json
+{
+  "id": "p_0000028",
+  "sku": "COR-0000028",
+  "brand": "Corvelth",
+  "brandTier": "oe",
+  "categorySlug": "lighting/bulbs",
+  "name": "Corvelth Bulbs N256",
+  "oeRef": "VAR-60358",
+  "attributes": { "weightG": 6270, "lengthMm": 676 },
+  "priceCents": 1130,
+  "stockQty": 51,
+  "supplierId": "s_05",
+  "universal": true,
+  "categoryPath": ["lighting", "lighting/bulbs"],
+  "fit": { "result": "fits", "reason": "Universal part, fits every vehicle" },
+  "fitments": []
+}
+```
+
+```sh
+curl 'localhost:4000/parts/OST-0004250?variantId=v_000001'
+```
+
+```json
+{
+  "id": "p_0004250",
+  "sku": "OST-0004250",
+  "brand": "Ostrik",
+  "brandTier": "standard",
+  "categorySlug": "suspension/shocks",
+  "name": "Ostrik Shock absorbers U663",
+  "oeRef": "VAR-38278",
+  "attributes": { "axle": "front", "weightG": 2837, "lengthMm": 421 },
+  "priceCents": 7730,
+  "stockQty": 59,
+  "supplierId": "s_06",
+  "universal": false,
+  "categoryPath": ["suspension", "suspension/shocks"],
+  "fit": {
+    "result": "fits",
+    "reason": "Fits Varenta Ivane P30-66 (2011-08 → 2016-02) on the front axle"
+  },
+  "fitments": [
+    {
+      "variantId": "v_000018",
+      "buildFrom": "2013-08",
+      "buildTo": "2016-04",
+      "axle": null,
+      "equipmentCode": null
+    },
+    {
+      "variantId": "v_000126",
+      "buildFrom": null,
+      "buildTo": null,
+      "axle": "front",
+      "equipmentCode": null
+    }
+  ]
+}
+```
+
+(Trimmed to two of seventeen fitment rows.)
+
+```sh
+curl 'localhost:4000/parts/nope'
+```
+
+```json
+{ "statusCode": 404, "message": "part nope not found" }
+```
+
+## Health
+
+### `GET /health`
+
+`{ "ok": true }` whenever the process is up. It does not probe the
+services.

@@ -87,10 +87,10 @@ rules are pure functions over plain data.
       `order_lines`, `stock_reservations`); deterministic generator with
       `small` and `large` profiles and supplier import-file output; COPY-based
       seeding; timings recorded
-- [ ] Elasticsearch: mapping with nested fitments; index builder from
+- [x] Elasticsearch: mapping with nested fitments; index builder from
       Postgres; alias strategy with count verification; `index:rebuild`
       command; timings recorded
-- [ ] Read API: `GET /vehicles/resolve`, `/vehicles/makes`,
+- [x] Read API: `GET /vehicles/resolve`, `/vehicles/makes`,
       `/vehicles/models`, `/vehicles`, `/vehicles/:id`, `/categories`,
       `/search`, `/parts/:sku`; `packages/contracts` zod schemas; `docs/api.md`
 - [ ] Import pipeline: `import.chunk` and `index.rebuild` queues; file

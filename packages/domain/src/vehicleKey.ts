@@ -1,5 +1,5 @@
-import { DomainError, type RegistrationKey, type VehicleVariant } from "./types.js";
-import { compareYearMonth } from "./yearMonth.js";
+import { DomainError, type RegistrationKey, type VehicleVariant } from "./types.ts";
+import { compareYearMonth } from "./yearMonth.ts";
 
 const MANUFACTURER = /^\d{4}$/;
 const TYPE = /^[A-Z0-9]{3}$/;
