@@ -1,8 +1,9 @@
 # passform — phase specs
 
-Nine phases. **One phase = one Claude Code session = one PR.** Each spec is
-self-contained: a fresh session reading only `CLAUDE.md`, `PLAN.md`, and its
-own phase section has everything it needs. No phase depends on chat history.
+Twelve phases: nine for Tier 1 (`v1.0.0`), three for Tier 2. **One phase =
+one Claude Code session = one PR.** Each spec is self-contained: a fresh
+session reading only `CLAUDE.md`, `PLAN.md`, and its own phase section has
+everything it needs. No phase depends on chat history.
 
 ## How a phase runs
 
@@ -1039,3 +1040,301 @@ believe this if a candidate showed it to me" and cut anything performative;
 the numbers table cites the commit it was measured on.
 
 **PR:** `docs: v1 documentation, ADR audit, numbers, name scrub, release`
+
+---
+
+## Phase 9 — Supplier price-and-stock fast path
+
+**Context for a fresh session:** Tier 1 is complete and tagged `v1.0.0`.
+ADR 11 describes two index paths and Tier 1 shipped only the slow one
+(full rebuild). This phase adds the fast path: a supplier endpoint that
+updates price and stock in Postgres and patches the live alias without a
+rebuild. The tie-breaker is `docs/superpowers/specs/2026-09-23-tier-2-design.md`,
+section 2.
+
+**Objective:** a supplier's price-and-stock delta is visible in search
+seconds later, the stored stock never double-counts units an open
+reservation will give back, and the endpoint is safe to retry.
+
+**In scope**
+
+1. Domain `packages/domain/src/stock.ts` (strict TDD):
+   `availableStock(reported: number, openReservedUnits: number): number` =
+   `max(0, reported − openReservedUnits)`; `DomainError` on a negative or
+   non-integer input. Export from `index.ts`. Tests: plain case, reserved
+   exceeds reported → 0, zero reserved, each invalid input.
+2. Contracts `packages/contracts/src/stock.ts`: `StockUpdateBody = { rows:
+   [{ sku: string, priceCents?: int ≥ 0, stockQty?: int ≥ 0 }] }` with
+   1–1,000 rows, unique `sku`s, and a refinement that every row carries
+   at least one of the two fields; `StockUpdateResponse = { updated: int,
+   unknown: string[], indexed: boolean }`. Contract tests for each
+   rejection.
+3. `PartsRepository.applyStockUpdate(supplierId, rows): Promise<{ applied:
+   { id, priceCents, stockQty }[]; unknown: string[] }>` in one
+   transaction:
+   1. `SELECT id, sku, price_cents, stock_qty FROM parts WHERE supplier_id =
+      $supplier AND sku = ANY($skus) FOR UPDATE`; SKUs not returned are
+      `unknown`.
+   2. Open reserved units per part: `SELECT part_id, SUM(qty) FROM
+      stock_reservations r JOIN orders o ON o.id = r.order_id WHERE
+      r.part_id = ANY($ids) AND r.released_at IS NULL AND o.status =
+      'placed' GROUP BY part_id`.
+   3. Per row: `stockQty` present → `availableStock(stockQty, reserved)`;
+      absent → unchanged. `UPDATE parts SET price_cents = $price, stock_qty
+      = $stock WHERE id = $id` with the unchanged values passed back
+      explicitly (no `COALESCE` in SQL; the decision is in TypeScript so it
+      is unit-testable).
+4. `StockService.apply(supplierId, body)`: 404 for an unknown supplier;
+   repository; then one `bulk` against the alias with an `update` per
+   applied part, `doc: { price_cents, in_stock }` where `in_stock` is
+   computed by the same function `partToDocument` uses (extract
+   `inStockOf(stockQty)` in `documents.ts` and use it in both places);
+   `refresh: "wait_for"`. A thrown bulk call or any `errors: true` item →
+   log at warn with the part ids and return `indexed: false`; never throw
+   after the Postgres commit.
+5. `StockController`: `PATCH /suppliers/:id/stock` in a new
+   `apps/api/src/stock/` module (controller, service, DTOs; the repository
+   method lives on `PartsRepository`). Always `200` once Postgres has
+   committed.
+6. Pragmatic unit tests: service with stubbed repository and ES client →
+   response mapping, 404, `indexed: false` on a bulk error; controller
+   rejects an empty `rows`, a duplicate `sku`, a row with neither field.
+7. Integration test `apps/api/test/stock.int.test.ts` against the compose
+   services with a throwaway index: seed two parts of one supplier and one
+   of another; patch price and stock → Postgres rows updated, `GET /search`
+   shows the new price and availability with no rebuild, the other
+   supplier's SKU is in `unknown`; a part with an open reservation of 2
+   and a reported stock of 5 stores 3; a `confirmed` order's reservation
+   does not reduce it; the same body sent twice yields the same Postgres
+   state.
+8. `docs/api.md`: the endpoint with a curl example and the real response.
+   `docs/numbers.md`: "Fast path" section, 1,000 rows through the endpoint
+   measured on the `large` seed, next to the rebuild time; README numbers
+   table gains the row.
+9. ADR 11 amended: the fast path is the request's second step after the
+   Postgres commit, reported through `indexed`, retry-safe because values
+   are absolute; the reservation subtraction rule and why. Status updated
+   in the ADR index.
+
+**Out of scope:** authentication on the endpoint (Tier 3), a queue or
+processor for stock updates, a web page, restoring stock on returns
+(Phase 11 does not either), any change to fitments through this path.
+
+**Acceptance:** the integration scenarios green locally and in CI; a curl
+of 1,000 rows against the running `large` stack answers with
+`indexed: true` and the numbers section quotes its wall-clock; a search
+issued right after shows the new price.
+
+**Phase review checklist:** the `FOR UPDATE` is the first statement of the
+transaction; the reservation sum excludes `confirmed` orders in SQL; the
+domain function is the only place the subtraction happens; the bulk
+touches exactly two fields; nothing throws after the commit; the response
+schema is the same object on both sides of the contract.
+
+**PR:** `feat(stock): supplier price-and-stock endpoint on the fast index path`
+
+---
+
+## Phase 10 — Saved vehicles
+
+**Context for a fresh session:** the web client (Phase 7) keeps one vehicle:
+the URL owns the selection and the `pf_variant` cookie mirrors it (ADR 15).
+This phase adds a saved list so a visitor can switch between a few
+vehicles without re-entering keys. Web-only; no API change. The
+tie-breaker is `docs/superpowers/specs/2026-09-23-tier-2-design.md`,
+section 3.
+
+**Objective:** a visitor saves the current vehicle with one click, sees the
+saved vehicles on the home page with their full labels, selects one with
+one click, and removes one; nothing in the cookie can go stale.
+
+**In scope**
+
+1. Codec `apps/web/src/lib/savedVehicles.ts` (pragmatic tests):
+   `SAVED_COOKIE = "pf_saved"`, `SAVED_MAX = 10`; `parseSaved(raw: string |
+   undefined): string[]` (JSON array of non-empty strings ≤ 64 chars,
+   deduplicated, truncated to the cap; anything else → `[]`);
+   `serializeSaved(ids)`; `addSaved(ids, id)` (moves an existing id to the
+   front, caps at 10, drops the oldest); `removeSaved(ids, id)`. Tests:
+   round-trip, junk, cap, move-to-front, remove missing.
+2. Server actions in `apps/web/src/app/actions.ts`: `saveVehicle(id)` and
+   `forgetVehicle(id)` read the cookie, apply the codec, write it back with
+   the same `path`, `sameSite` and `maxAge` as `pf_variant`, and
+   `revalidatePath` for `/` and the current page. Ids are trimmed and
+   length-checked like `selectVehicle`.
+3. `VehicleBar`: a toggle next to "change" reading exactly "save this
+   vehicle" or "saved" (a button with visible text; the saved state also
+   carries `aria-pressed`). Clicking calls the matching action. The bar
+   reads the saved list on the server, so no client store is involved.
+4. Home page: when the cookie holds ids, a "Saved vehicles" section above
+   the picker; each entry is fetched with `GET /vehicles/:id` in parallel
+   (`Promise.allSettled`; missing ids dropped from the render, not from the
+   cookie), rendered as a button with the domain `variantLabel` that calls
+   the existing `selectVehicle`, plus a "remove" button calling
+   `forgetVehicle`. Empty list → the section is absent.
+5. Smoke test: home page with a cookie of two ids and a mocked `apiFetch`
+   returning two variants asserts both labels and the remove controls
+   render; `VehicleBar` with the current vehicle saved renders "saved".
+6. ADR 15 amended: the fourth state home is the `pf_saved` cookie, why it
+   is a cookie and not the Zustand store (server components render the
+   list), why ids only, and that it never selects a vehicle on its own.
+7. Manual QA pasted into the PR: resolve a key → save → home shows it →
+   resolve another → save → home shows both, newest first → select the
+   first → results page carries it in the URL → remove one → gone;
+   keyboard-only pass over the toggle and the list; the cookie in devtools
+   is a short id array.
+
+**Out of scope:** an API endpoint for saved vehicles, per-user storage,
+a dedicated page, naming or ordering by the visitor, any change to the
+selected-vehicle mechanism.
+
+**Acceptance:** the QA script passes; the smoke tests pass; Lighthouse a11y
+stays ≥ 95 on `/`; the network tab shows one `GET /vehicles/:id` per saved
+id and nothing else new.
+
+**Phase review checklist:** the cookie holds ids only; the codec is the
+only code that reads or writes its format; no component keeps a copy of
+the saved list in React state; both controls have visible text; the
+existing `selectVehicle` action is reused, not duplicated.
+
+**PR:** `feat(web): saved vehicles list in a cookie, save toggle and one-click select`
+
+---
+
+## Phase 11 — Event log and return-rate feedback
+
+**Context for a fresh session:** the catalogue, search, imports, orders and
+the fast stock path (Phase 9) are complete. Nothing yet feeds back into
+fitment quality. This phase adds an append-only event log on a local
+DynamoDB (`amazon/dynamodb-local`), a returns endpoint, and a feedback view
+that names parts whose fitment data to distrust. The tie-breaker is
+`docs/superpowers/specs/2026-09-23-tier-2-design.md`, section 4, which
+also holds the table design.
+
+**Objective:** every search, placed order, confirmed order and return is an
+immutable event; re-emitting an event never double-counts; an operator can
+open `/feedback` and read which parts come back as "did not fit", for which
+vehicles, and whether the numbers are large enough to act on.
+
+**In scope**
+
+1. Orders know their vehicle: `CreateOrderBody.variantId?: string`,
+   migration adding nullable `orders.variant_id` (additive, no backfill),
+   `OrderResponse.variantId: string | null`; the cart sends the store's
+   `variantId`. Contract and repository tests extended; the replay test
+   proves an order placed without the field still replays byte-identically.
+2. Domain `packages/domain/src/returns.ts` (strict TDD):
+   - `RETURN_REASONS = ["did_not_fit", "damaged", "other"] as const` and
+     `ReturnReason`;
+   - `validateReturn(order: { status, lines: { partId, qty }[] }, input: {
+     partId, qty }): ReturnValidation` returning `{ ok: true }` or `{ ok:
+     false, code: "not_confirmed" | "part_not_on_order" | "qty_exceeds_line"
+     | "qty_invalid", message }`;
+   - `returnRates(counters: { partId, confirmedUnits, didNotFitUnits }[],
+     thresholds = { minConfirmedUnits: 3, distrustAbove: 0.2 })` returning
+     `{ partId, confirmedUnits, didNotFitUnits, rate, distrust, reason }[]`
+     sorted by rate desc, then units desc, then partId; `rate` rounded to
+     two decimals; below the minimum → `distrust: false` with the reason
+     "fewer than 3 confirmed units"; at or above both thresholds →
+     `distrust: true` with the reason naming the rate and the units.
+   Export from `index.ts`.
+3. Contracts `packages/contracts/src/returns.ts` and `feedback.ts`:
+   `ReturnBody = { partId, qty: int ≥ 1, reason: ReturnReason }`;
+   `ReturnResponse = { id, orderId, partId, qty, reason, variantId,
+   recordedAt }`; `ReturnRatesResponse = { rows: [{ partId, sku, name,
+   confirmedUnits, didNotFitUnits, rate, distrust, reason, variants: [{ id,
+   label, didNotFitUnits }] }], thresholds: { minConfirmedUnits,
+   distrustAbove } }`; `ReturnRatesQuery = { limit: int 1..100, default 20 }`.
+4. Infrastructure: `docker-compose.yml` service `dynamodb` from
+   `amazon/dynamodb-local` on `8000` with `-sharedDb` and a volume; the
+   same as a CI service with a reachability check; `.env.example` gains
+   `DYNAMODB_ENDPOINT=http://localhost:8000`, `AWS_REGION=eu-central-1`,
+   `AWS_ACCESS_KEY_ID=local`, `AWS_SECRET_ACCESS_KEY=local`;
+   `EVENTS_TABLE=passform_events` with a default. Dependencies
+   `@aws-sdk/client-dynamodb` and `@aws-sdk/lib-dynamodb`.
+5. `apps/api/src/events/`: `dynamo.client.ts` (document client from the
+   env), `table.ts` (`ensureEventsTable(name)`: create with `pk`/`sk` and
+   the `gsi1` index if missing, on-demand billing mode, idempotent),
+   `events.repository.ts`, `events.service.ts`, `events.module.ts`, and a
+   script `npm run events:setup` (root and api) that `db:setup` runs after
+   `db:migrate`.
+6. `EventsRepository`, tested by integration against a throwaway table:
+   - `append(event)`: conditional put (`attribute_not_exists(pk)`),
+     returns `"appended" | "duplicate"`;
+   - `appendWithCounters(event, deltas: { partId, variantId | null,
+     confirmedUnits, didNotFitUnits }[])`: one `TransactWriteItems` with
+     the conditional put and `ADD` updates on `part#<id>/counters` (setting
+     `gsi1pk`/`gsi1sk` on first write) and `part#<id>/variant#<vid>`; a
+     `ConditionalCheckFailed` on the put means duplicate → no counter moves,
+     return `"duplicate"`;
+   - `listCounters(limit)`: query `gsi1` with `gsi1pk = "counters"`,
+     paginated until `limit` or exhausted;
+   - `variantsOf(partId)`: query `pk = part#<id>` with `sk` beginning
+     `variant#`.
+7. `EventsService.record(...)`: typed methods `searchImpression`,
+   `orderPlaced`, `orderConfirmed`, `returnReported`, each building the
+   event with the id rule from the design note, calling the repository,
+   and catching every error into a warn log. Never throws. Wired into
+   `SearchService.search` (after the hits are built), `OrdersService.create`
+   (only for `created`, not `replayed`), `OrdersService.confirm` (only when
+   the update changed a row).
+8. Returns: `OrdersService.report(orderId, body)`: load the order (404),
+   `validateReturn` (409 for `not_confirmed`, 400 otherwise), then
+   `events.returnReported` through `appendWithCounters` with
+   `didNotFitUnits = qty` only when `reason === "did_not_fit"`; a
+   `"duplicate"` result is a 409 "line already returned". `POST
+   /orders/:id/returns` → 201. Stock is not restored.
+9. Feedback: `FeedbackService.returnRates(limit)`: counters → domain
+   `returnRates` → top `limit` → sku and name from `PartsRepository.
+   findByIds` → variants per part via `variantsOf` labelled with
+   `VehiclesRepository.findByIds` and `variantLabel`; unknown ids are
+   skipped. `GET /feedback/return-rates` in `apps/api/src/feedback/`.
+10. Pragmatic unit tests: `OrdersService.report` with stubs for each
+    validation outcome and the duplicate; `FeedbackService` with stubbed
+    repositories → shape and ordering; `EventsService` swallows a thrown
+    repository error and search still returns.
+11. Integration test `apps/api/test/events.int.test.ts` (throwaway table
+    and index): a search appends one impression; place → confirm →
+    `order.placed` and `order.confirmed` present with the variant; confirm
+    twice → one `order.confirmed` and counters moved once; a return of
+    `did_not_fit` moves both counters; the same return again → 409 and
+    counters unchanged; a `damaged` return moves neither; `GET
+    /feedback/return-rates` ranks the returned part first with its variant
+    labelled; a return on a `placed` order → 409; a part not on the order →
+    400.
+12. Web: `/feedback` page (RSC, polling not needed) listing the rows as a
+    table with the distrust flag as text ("distrust: 2 of 5 confirmed units
+    came back as did not fit" style, never colour alone), the variants per
+    row, and the thresholds in a footnote; linked from the imports page
+    header as "return rates". The order page gains a return form for
+    `confirmed` orders (line select, qty, reason select) posting to the
+    endpoint and showing the recorded return or the error text. Smoke test
+    for `/feedback` with two mocked rows, one distrusted.
+13. Docs: `docs/api.md` for the two endpoints and the `variantId` field;
+    README architecture diagram gains the event log and the feedback view;
+    a screenshot `docs/screenshots/feedback.png` from the QA run; the
+    README quick start mentions the fourth service. ADR 16 written; the
+    ADR index updated.
+14. Manual QA pasted into the PR: place and confirm three orders for one
+    part across two vehicles → report two `did_not_fit` returns → `/feedback`
+    lists the part as distrusted with both vehicles → report the same
+    return again → 409 shown as text → Bull Board and search untouched;
+    stop the DynamoDB container → search and orders still work and the API
+    log shows the warn lines → start it again.
+
+**Out of scope:** restoring stock on return, a returns list endpoint, TTL
+on impressions, DynamoDB streams, any aggregate beyond return rates, an
+operator login (Tier 3), LocalStack.
+
+**Acceptance:** all integration scenarios green locally and in CI with the
+new service; the QA script passes; with the DynamoDB container stopped the
+Tier 1 flows are unaffected.
+
+**Phase review checklist:** every event write is conditional on its key;
+the transaction is the only way counters move; no event id is derived from
+a timestamp except impressions; `EventsService` has no code path that
+throws; the domain function is the only place a rate or a distrust flag is
+computed; the search service's only new dependency is `EventsService`;
+nothing in Postgres reads from DynamoDB.
+
+**PR:** `feat(events): append-only event log on dynamodb, returns endpoint, return-rate feedback view`
