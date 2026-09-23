@@ -93,7 +93,7 @@ rules are pure functions over plain data.
 - [x] Read API: `GET /vehicles/resolve`, `/vehicles/makes`,
       `/vehicles/models`, `/vehicles`, `/vehicles/:id`, `/categories`,
       `/search`, `/parts/:sku`; `packages/contracts` zod schemas; `docs/api.md`
-- [ ] Import pipeline: `import.chunk` and `index.rebuild` queues; file
+- [x] Import pipeline: `import.chunk` and `index.rebuild` queues; file
       splitter; idempotent chunk processor with per-chunk transaction;
       retries with backoff, DLQ, concurrency limiter; progress; rebuild
       trigger; Bull Board at `/admin/queues`; `POST /imports`, `GET /imports/:id`

@@ -1,14 +1,14 @@
 # REST API
 
-The read side of the contract (Tier 1, Phase 4). Base URL in development:
+The read side of the contract (Tier 1, Phase 4) and the import endpoints
+(Phase 5). Base URL in development:
 `http://localhost:4000`. Every body is JSON; every schema lives in
 `packages/contracts` and is the same definition the web app parses
 responses with (ADR 13). Ids are strings, money is integer cents, build
 dates are `YYYY-MM`. All examples below were run against the `small`
 profile; the data is synthetic and every name is invented.
 
-Imports (`POST /imports`, `GET /imports/:id`) arrive in Phase 5, orders in
-Phase 6.
+Orders arrive in Phase 6.
 
 ## Errors
 
@@ -496,6 +496,130 @@ curl 'localhost:4000/parts/nope'
 
 ```json
 { "statusCode": 404, "message": "part nope not found" }
+```
+
+## Imports
+
+An import runs on the queue (ADR 8): `POST` records it, splits the file
+and answers `202` at once; `GET` reports progress until the status is
+terminal, after which one index rebuild runs and swaps the alias. Bull
+Board at `/admin/queues` shows the `import.chunk`, `index.rebuild` and
+`import.chunk.dlq` queues.
+
+### `POST /imports`
+
+JSON body `CreateImportBody`:
+
+| Field        | Required | Notes                                                                                   |
+| ------------ | -------- | --------------------------------------------------------------------------------------- |
+| `supplierId` | yes      | An existing supplier                                                                    |
+| `path`       | no       | A `.jsonl` file relative to `DATA_DIR`, such as one from `npm run data:generate-import` |
+
+Or `multipart/form-data` with the fields `supplierId` and `file`; the upload
+is stored under `DATA_DIR/imports/uploads/` and imported from there. One of
+`path` and `file` is required.
+
+Each line of the file is one supplier row: `{ sku, brand, brandTier,
+categorySlug, name, oeRef, attributes, priceCents, stockQty, universal,
+fitments: [{ variantId, buildFrom, buildTo, axle, equipmentCode }] }`. Rows
+are validated by the domain rules and checked against the catalogue; a
+rejected row (bad shape, unknown category or variant) counts in `failedRows`
+and is reported on its chunk, and never fails the import. A SKU the
+catalogue has is updated in every mutable column and its fitments are
+replaced; a new SKU is inserted with the id `p_<sku>`.
+
+Response: `202` with `CreateImportResponse` `{ importId }`.
+
+Errors: `400` for a body that fails the schema, a `path` outside
+`DATA_DIR`, or neither `path` nor `file`; `404` for an unknown supplier or a
+`path` that is not there.
+
+```sh
+curl -H 'content-type: application/json' \
+  -d '{"supplierId":"s_01","path":"imports/s_01-500000.jsonl"}' \
+  localhost:4000/imports
+```
+
+```json
+{ "importId": "imp_8a3ecd094ef9" }
+```
+
+```sh
+curl -H 'content-type: application/json' \
+  -d '{"supplierId":"s_01","path":"../secrets.jsonl"}' localhost:4000/imports
+```
+
+```json
+{ "statusCode": 400, "message": "path must be inside DATA_DIR: ../secrets.jsonl" }
+```
+
+```sh
+curl -H 'content-type: application/json' -d '{"supplierId":"s_99","path":"imports/s_01-500000.jsonl"}' localhost:4000/imports
+```
+
+```json
+{ "statusCode": 404, "message": "supplier s_99 not found" }
+```
+
+### `GET /imports/:id`
+
+`ImportStatusResponse`:
+
+| Field           | Type                                                          | Notes                                          |
+| --------------- | ------------------------------------------------------------- | ---------------------------------------------- |
+| `id`            | string                                                        |                                                |
+| `status`        | `queued` \| `running` \| `completed` \| `partial` \| `failed` | See below                                      |
+| `totalRows`     | integer                                                       | Non-empty lines in the file                    |
+| `processedRows` | integer                                                       | Rows upserted so far                           |
+| `failedRows`    | integer                                                       | Rows rejected so far                           |
+| `chunks`        | `{ pending, done, failed }`                                   | Counts of 1,000-row chunks by outcome          |
+| `startedAt`     | ISO timestamp \| null                                         | When the first job was queued                  |
+| `finishedAt`    | ISO timestamp \| null                                         | When the last chunk became terminal            |
+| `error`         | `{ message }` \| null                                         | Set when the split or the index rebuild failed |
+
+`completed` means every row is in. `partial` means some rows were
+rejected, or a chunk failed after every retry: its job sits in
+`import.chunk.dlq` with the error and the rejected rows attached, and the
+other chunks' rows are in. `failed` means the file could not be split;
+nothing was written. Both `completed` and `partial` queue a rebuild, so the
+index catches up with whatever did land.
+
+Errors: `404` for an unknown import id.
+
+```sh
+curl localhost:4000/imports/imp_8a3ecd094ef9
+```
+
+Two seconds in:
+
+```json
+{
+  "id": "imp_8a3ecd094ef9",
+  "status": "running",
+  "totalRows": 500000,
+  "processedRows": 8000,
+  "failedRows": 0,
+  "chunks": { "pending": 492, "done": 8, "failed": 0 },
+  "startedAt": "2026-09-23T08:20:17.010Z",
+  "finishedAt": null,
+  "error": null
+}
+```
+
+Two minutes later:
+
+```json
+{
+  "id": "imp_8a3ecd094ef9",
+  "status": "completed",
+  "totalRows": 500000,
+  "processedRows": 500000,
+  "failedRows": 0,
+  "chunks": { "pending": 0, "done": 500, "failed": 0 },
+  "startedAt": "2026-09-23T08:20:17.010Z",
+  "finishedAt": "2026-09-23T08:22:22.485Z",
+  "error": null
+}
 ```
 
 ## Health

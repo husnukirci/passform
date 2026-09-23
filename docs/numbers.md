@@ -73,3 +73,41 @@ Notes:
   `select count(*) from parts` and the alias swap. The old index is deleted
   after the swap, so two copies exist for the length of a rebuild.
 - The small profile (5,000 parts, 57,204 fitment rows) rebuilds in 0.6 s.
+
+## Phase 5: import pipeline
+
+The 500,000-row supplier file from Phase 2 (`.data/imports/s_01-500000.jsonl`,
+676 MB, 70% of rows updating SKUs the `small` profile has and 30% new SKUs)
+imported into the `small` seed through the queue: `POST /imports` with
+`{ "supplierId": "s_01", "path": "imports/s_01-500000.jsonl" }` against the
+built API running in one process, worker in-process with concurrency 4 and
+a limiter of 4 chunk starts per second, Redis 7 in the same Docker.
+
+| Figure                                             |                       Value |
+| -------------------------------------------------- | --------------------------: |
+| Rows in the file                                   |                     500,000 |
+| Split into chunk files (`POST /imports` latency)   |                       1.3 s |
+| Chunks of 1,000 rows                               |               500, all done |
+| Rows rejected                                      |                           0 |
+| **Import wall-clock, `startedAt` to `finishedAt`** |                 **125.5 s** |
+| Rows per second                                    |                       3,980 |
+| Parts after the import                             |                     155,000 |
+| Fitment rows after the import                      |                   1,771,789 |
+| Rebuild queued on completion, create to swap       |                      10.0 s |
+| Rebuilt index: parts / Lucene documents / size     | 155,000 / 1,926,789 / 77 MB |
+| `GET /search` polled every 200 ms during the run   |       166 requests, all 200 |
+
+Notes:
+
+- The observed rate sits on the limiter's ceiling of 4,000 rows per second,
+  so the chunk transaction (1,000 upserts and about 3,500 fitment rows) is
+  not the bound; it completes in well under a second. The throttle is a
+  choice (ADR 8): an import must not starve the read path's connection
+  pool, and 500,000 rows in two minutes is the intended shape, not a
+  benchmark.
+- The search poll ran from the 208,000-row mark to past the alias swap; an
+  earlier copy of the loop had exited on a scripting error before the first
+  request. Every response in the window was `200`.
+- Postgres after the run: `fitments` 440 MB, `parts` 73 MB. The split
+  reads the file once and writes 500 chunk files under
+  `.data/imports/<importId>/`.
