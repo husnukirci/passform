@@ -15,7 +15,7 @@ import {
   validateImportRow,
 } from "@passform/domain";
 
-import { JsonlWriter, readJsonl } from "./jsonl.js";
+import { JsonlWriter, readJsonl } from "../src/infra/jsonl.js";
 import { dataDir, userPath } from "./paths.js";
 import { Rng } from "./prng.js";
 import {

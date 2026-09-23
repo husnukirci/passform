@@ -1,5 +1,6 @@
 // Line-oriented JSON helpers with backpressure, so a 2,000,000-part file
-// streams to disk without buffering in memory.
+// streams to disk without buffering in memory. Shared by the generator, the
+// seeder and the import splitter.
 
 import { createReadStream, createWriteStream, type WriteStream } from "node:fs";
 import { once } from "node:events";

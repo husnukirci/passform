@@ -22,7 +22,7 @@ import { fitmentToRow, partToRow, variantToRow } from "../src/infra/db/mappers.j
 import * as schema from "../src/infra/db/schema.js";
 import type { Category } from "./categories.js";
 import { chunked, csvLine, pgTextArray } from "./csv.js";
-import { readJsonl } from "./jsonl.js";
+import { readJsonl } from "../src/infra/jsonl.js";
 import type { Supplier } from "./names.js";
 import { dataDir, userPath } from "./paths.js";
 import type { PartLine } from "./synth.js";
