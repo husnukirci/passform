@@ -124,6 +124,39 @@ Notes:
   reads the file once and writes 500 chunk files under
   `.data/imports/<importId>/`.
 
+## Fast path
+
+Measured in Phase 9 on the same machine, on the stock endpoint's commit
+(`42667a7`). `PATCH /suppliers/s_01/stock` with 1,000 rows, each carrying
+both `priceCents` and `stockQty` (the supplier's first 1,000 parts by id,
+every value changed), against the built API on the `large` seed with the
+2,000,000-document index behind the alias. curl's `time_total`, three
+requests in a row with the same body, then one `GET /search` for the first
+SKU.
+
+| Figure                                                     |          Value |
+| ---------------------------------------------------------- | -------------: |
+| Rows in the body                                           |          1,000 |
+| `updated` / `unknown`                                      |      1,000 / 0 |
+| **First request, wall-clock**                              |     **0.87 s** |
+| Second and third request, same body                        | 0.23 s, 0.21 s |
+| `GET /search` right after, showing the new price and stock |         0.05 s |
+| Rebuild the fast path replaces for these rows (above)      |        124.0 s |
+
+Notes:
+
+- One request is one Postgres transaction (`FOR UPDATE` on the 1,000
+  rows, the reservation sum, 1,000 `UPDATE` statements) followed by one
+  `_bulk` of 1,000 partial updates with `refresh: "wait_for"`, so the
+  response arrives after the index has refreshed and the search that
+  follows already sees it (ADR 11).
+- The first request pays for the connection pool and the Elasticsearch
+  client warming up; the second and third are the steady state. All three
+  answered `indexed: true`, and the same body three times left the same
+  rows in Postgres, which is the retry guarantee.
+- The large index (1.3 GB) was rebuilt for this run with
+  `SEARCH_ALIAS=parts_large` and deleted afterwards.
+
 ## Lighthouse
 
 Production build (`next build` + `next start`) against the small profile,

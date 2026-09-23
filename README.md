@@ -130,6 +130,7 @@ were measured on.
 | Largest `fitments` array on one part                             |                          20 |
 | 500,000-row supplier import through the queue                    |      125.2 s (3,995 rows/s) |
 | `GET /search` every 200 ms during that import and its swap       |       328 requests, all 200 |
+| 1,000-row price-and-stock delta through the fast path (P9)       | 0.23 s (first request 0.87) |
 | Lighthouse (production build): accessibility / best practices    |          100 / 100, 4 pages |
 
 The import rate sits on the worker's limiter by design (four chunk starts
@@ -152,7 +153,7 @@ Each is recorded as a short Nygard-style entry in
 | Chunked, idempotent import jobs with a dead-letter queue                  | [8](docs/decisions.md#adr-8-chunked-idempotent-import-jobs-on-bullmq-with-a-dead-letter-queue)                    |
 | Idempotency keys with stored-response replay                              | [9](docs/decisions.md#adr-9-idempotency-keys-for-order-creation-with-stored-response-replay)                      |
 | Stock reservation by conditional update; expiry as compensation           | [10](docs/decisions.md#adr-10-stock-reservation-by-conditional-update-expiry-as-compensation)                     |
-| Slow and fast index paths (fast path is Tier 2)                           | [11](docs/decisions.md#adr-11-slow-and-fast-index-paths)                                                          |
+| Slow and fast index paths                                                 | [11](docs/decisions.md#adr-11-slow-and-fast-index-paths)                                                          |
 | Local-first infrastructure; deployment deferred                           | [12](docs/decisions.md#adr-12-local-first-infrastructure-deployment-deferred-to-tier-3)                           |
 | zod via nestjs-zod, schemas shared through `packages/contracts`           | [13](docs/decisions.md#adr-13-zod-via-nestjs-zod-with-the-schemas-shared-through-packagescontracts)               |
 | Workspace packages consumed as TypeScript source                          | [14](docs/decisions.md#adr-14-workspace-packages-are-consumed-as-typescript-source)                               |
@@ -231,14 +232,14 @@ returned.
 
 ## Roadmap
 
-Tier 1 (this release, `v1.0.0`) is complete. Tier 2 and 3 items are
-follow-ups, not prerequisites, and may never ship; they are listed in
-[PLAN.md](PLAN.md) so cuts are deliberate:
+Tier 1 (`v1.0.0`) is complete. Tier 2 and 3 items are follow-ups, not
+prerequisites, and may never ship; they are listed in [PLAN.md](PLAN.md)
+so cuts are deliberate:
 
-- **Tier 2:** an append-only event log (search impressions, orders,
-  returns) on a local DynamoDB and the return-rate view that names parts
-  whose fitment data to distrust; a supplier price-and-stock partial-update
-  endpoint on the fast index path; saved vehicles.
+- **Tier 2:** the supplier price-and-stock endpoint on the fast index path
+  (shipped in Phase 9); saved vehicles; an append-only event log (search
+  impressions, orders, returns) on a local DynamoDB and the return-rate
+  view that names parts whose fitment data to distrust.
 - **Tier 3:** an API gateway with keys and rate limits in front of the read
   API, infrastructure as code, cloud deployment, authentication.
 
