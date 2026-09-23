@@ -12,5 +12,7 @@ import { SuppliersRepository } from "./suppliers.repository.js";
   imports: [DbModule, VehiclesModule],
   controllers: [CatalogController],
   providers: [CategoriesRepository, PartsRepository, SuppliersRepository, CatalogService],
+  // The stock module writes through the same repositories rather than owning a second copy.
+  exports: [PartsRepository, SuppliersRepository],
 })
 export class CatalogModule {}

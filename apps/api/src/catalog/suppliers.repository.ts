@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { SupplierDto } from "@passform/contracts";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import { type Db } from "../infra/db/client.js";
 import { DB } from "../infra/db/db.module.js";
@@ -16,5 +16,13 @@ export class SuppliersRepository {
       .select({ id: suppliers.id, name: suppliers.name })
       .from(suppliers)
       .orderBy(asc(suppliers.id));
+  }
+
+  async exists(id: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: suppliers.id })
+      .from(suppliers)
+      .where(eq(suppliers.id, id));
+    return row !== undefined;
   }
 }
