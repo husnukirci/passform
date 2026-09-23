@@ -31,3 +31,4 @@ export {
   OrderResponse,
   OrderStatus,
 } from "./orders.ts";
+export { STOCK_UPDATE_MAX_ROWS, StockUpdateBody, StockUpdateResponse } from "./stock.ts";
