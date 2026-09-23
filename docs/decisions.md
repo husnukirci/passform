@@ -377,3 +377,36 @@ so a `./types.js` import inside a package fails at runtime because no
 emitted output. This was found when the running API first imported the
 domain package; the Phase 2 scripts had sidestepped it by running under
 `tsx`.
+
+## ADR 15: The browser calls the API directly; the URL is the vehicle's one home
+
+**Context.** The web client (Phase 7) has two kinds of data flow: server
+components render search results and part detail on the server, while
+client islands (vehicle lookup, cart checkout, order replay and confirm,
+import progress) act on the visitor's clicks. Those islands could go
+through a Next.js route handler that forwards to the API, or straight to
+the API from the browser. The selected vehicle likewise had two candidate
+homes: the URL, which makes results shareable, and a cookie, which makes
+`/parts` work with no query string.
+
+**Decision.** Client islands call the API directly with
+`NEXT_PUBLIC_API_URL`, and the API enables CORS for the web origin
+(`WEB_ORIGIN`). There is no proxy layer in the web app, so the REST
+contract is exercised end to end by a real second origin, which is the
+point of ADR 1. The URL owns the vehicle, the filters, the sort and the
+page. A server action mirrors the chosen vehicle into the `pf_variant`
+cookie, and a request for `/parts` without `?variant=` redirects to the
+canonical URL that carries it. The cookie never feeds a query on its own,
+and no component keeps a copy of a URL parameter in React state.
+Replaying an order sends the request the cart sent, kept in
+`sessionStorage`, rather than rebuilding it from the current order.
+
+**Consequences.** The network tab shows exactly two origins: the web app
+for pages and the API for data, and every API response passes through
+the same `packages/contracts` schema on either side. CORS is a piece of
+API configuration the deployment has to carry. Filter and vehicle state
+survive reload and are shareable by link; a client-side navigation to
+`/parts` redirects at once, while a cold document load with a `loading`
+boundary streams the shell first and completes the redirect from inside
+the stream. "Send again" is only offered in the tab that placed the
+order, because that is the only tab that has the identical body and key.
