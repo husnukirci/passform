@@ -10,6 +10,7 @@ describe("domain package public surface", () => {
       "DomainError",
       "PAGE_SIZE",
       "RESERVATION_TTL_MINUTES",
+      "availableStock",
       "buildSearchQuery",
       "canonicalJson",
       "chunkRanges",

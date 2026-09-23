@@ -33,5 +33,7 @@ export {
   reservationExpiresAt,
 } from "./orders.ts";
 
+export { availableStock } from "./stock.ts";
+
 export type { ChunkRange, ImportRow, RowValidation } from "./importRows.ts";
 export { CHUNK_SIZE, chunkRanges, validateImportRow } from "./importRows.ts";
