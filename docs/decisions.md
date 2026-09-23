@@ -1,10 +1,32 @@
 # Architecture decision records
 
-Short-form Nygard entries: Context, Decision, Consequences. Numbered in the
-order PLAN.md lists them; an entry is written in the same commit as the
-choice it records.
+Short-form Nygard entries: Status, Context, Decision, Consequences.
+Numbered in the order PLAN.md lists them, with two added during the build
+(14 and 15); an entry is written in the same commit as the choice it
+records. Audited for v1.0.0: every entry below is accepted and describes
+the code as shipped.
+
+| ADR | Title                                                                    | Phase | Status                        |
+| --: | ------------------------------------------------------------------------ | ----- | ----------------------------- |
+|   1 | Separate NestJS API and thin Next.js client in one monorepo              | P0    | accepted                      |
+|   2 | Drizzle in NestJS over TypeORM or Prisma                                 | P0    | accepted                      |
+|   3 | Domain core as a pure, isomorphic TypeScript package                     | P1    | accepted, amended in P8       |
+|   4 | Fitment is a filter, never a score                                       | P1    | accepted                      |
+|   5 | Fitments as nested documents on the part                                 | P3    | accepted                      |
+|   6 | Postgres is the source of truth; Elasticsearch is derived, alias-swapped | P3    | accepted                      |
+|   7 | Deterministic generator with size profiles; all names invented           | P2    | accepted                      |
+|   8 | Chunked, idempotent import jobs on BullMQ with a dead-letter queue       | P5    | accepted                      |
+|   9 | Idempotency keys for order creation with stored-response replay          | P6    | accepted, amended in P8       |
+|  10 | Stock reservation by conditional update; expiry as compensation          | P6    | accepted                      |
+|  11 | Slow and fast index paths                                                | P3    | accepted; fast path is Tier 2 |
+|  12 | Local-first infrastructure; deployment deferred to Tier 3                | P0    | accepted                      |
+|  13 | zod via nestjs-zod, schemas shared through `packages/contracts`          | P4    | accepted                      |
+|  14 | Workspace packages are consumed as TypeScript source                     | P0    | accepted, amended in P4       |
+|  15 | The browser calls the API directly; the URL is the vehicle's one home    | P7    | accepted, amended in P8       |
 
 ## ADR 1: Separate NestJS API and thin Next.js client in one monorepo
+
+**Status.** Accepted.
 
 **Context.** The backend is the deliverable: fit-constrained search, an
 import pipeline, idempotent orders. A web client is still needed to make
@@ -26,6 +48,8 @@ reach the database directly are deliberately unused.
 
 ## ADR 2: Drizzle in NestJS over TypeORM or Prisma
 
+**Status.** Accepted.
+
 **Context.** The order transaction relies on a conditional stock update
 (`UPDATE ... WHERE stock_qty >= qty`), the import pipeline relies on
 per-chunk transactions and COPY-based seeding, and schema changes must be
@@ -43,6 +67,8 @@ database module is hand-wired rather than provided by an integration
 package.
 
 ## ADR 3: Domain core as a pure, isomorphic TypeScript package
+
+**Status.** Accepted; amended in Phase 8 (no contracts schema for import rows).
 
 **Context.** Fit evaluation, registration-key resolution, the search query
 builder, order arithmetic and import validation are the rules the project
@@ -63,11 +89,18 @@ specification.
 **Consequences.** The rules run identically in the API, in a worker and in
 the browser, and the whole suite runs in well under a second. The package
 must stay erasable TypeScript so Node's type stripping can load it (ADR
-14). Validation without zod costs a small hand-rolled collector and a
-duplicated shape between `ImportRow` here and the zod schema in
-`packages/contracts` once Phase 4 adds it; a contracts test will pin the two together.
+14). Validation without zod costs a small hand-rolled collector.
+
+_Amended in Phase 8._ This entry once anticipated a duplicated zod schema
+for import rows in `packages/contracts`, pinned to the domain shape by a
+test. It never appeared: the API validates supplier rows through
+`validateImportRow` directly (`apps/api/src/imports/rows.ts`), so an import
+row has one definition, in the domain, and the pinning test was never
+needed.
 
 ## ADR 4: Fitment is a filter, never a score
+
+**Status.** Accepted.
 
 **Context.** A part that does not fit the vehicle must never appear in
 results, however relevant its text or however good its price. Search
@@ -90,6 +123,8 @@ named equipment code, not a lower score. Filter clauses are cached by
 Elasticsearch, which also makes this the cheaper shape.
 
 ## ADR 5: Fitments as nested documents on the part
+
+**Status.** Accepted.
 
 **Context.** A part fits several variants, each with its own optional
 build window, axle and equipment restriction. Search must match one row's
@@ -116,6 +151,8 @@ fitment changes take the rebuild path (ADR 11).
 
 ## ADR 6: Postgres is the source of truth; Elasticsearch is derived and rebuilt behind an alias
 
+**Status.** Accepted.
+
 **Context.** Search needs an inverted index; orders and imports need
 transactions. Keeping two stores in step by dual-writing invites drift with
 no way to tell which side is right. An index rebuild that replaces documents
@@ -139,6 +176,8 @@ stock flag) is derived at build time from Postgres, so a schema change on
 the Postgres side is a rebuild, never a migration of the index.
 
 ## ADR 7: Deterministic generator with size profiles; all names invented
+
+**Status.** Accepted.
 
 **Context.** The project needs a catalogue large enough to make index
 builds, imports and search behaviour measurable, but it must not carry real
@@ -170,6 +209,8 @@ because nothing outside the generated files refers to them. The name file
 is the single place the name scrub has to audit.
 
 ## ADR 8: Chunked, idempotent import jobs on BullMQ with a dead-letter queue
+
+**Status.** Accepted.
 
 **Context.** A supplier file has hundreds of thousands of rows and must be
 imported while search keeps answering. One long job fails as a whole and
@@ -215,6 +256,8 @@ to revisit before the two are deployed apart.
 
 ## ADR 9: Idempotency keys for order creation with stored-response replay
 
+**Status.** Accepted; amended in Phase 8 (line order).
+
 **Context.** A client that loses the response to `POST /orders` (timeout,
 dropped connection, a double click) sends the request again. The second
 receipt must not place a second order, and the client must get back the
@@ -245,7 +288,15 @@ a lock slot and briefly serialise for no reason, which costs latency and
 never correctness. Keys are never expired, so the table remembers every
 order ever placed under one; a retention rule belongs to a later tier.
 
+_Amended in Phase 8._ The stored body and `GET /orders/:id` must agree on
+line order, or a replay would look like a different order. Lines carry a
+`position` column (migration `0001`) and read back in the order they were
+sent; the Phase 6 integration test that compares the two bodies is what
+caught the original SKU-sorted read.
+
 ## ADR 10: Stock reservation by conditional update; expiry as compensation
+
+**Status.** Accepted.
 
 **Context.** Two buyers can race for the last unit. Reading the stock and
 then writing it lets both read the same number; an application lock
@@ -285,6 +336,8 @@ their lines and reservations as history, with `released_at` set.
 
 ## ADR 11: Slow and fast index paths
 
+**Status.** Accepted; the fast path is a Tier 2 follow-up.
+
 **Context.** Catalogue and fitment changes arrive as supplier files and
 touch many parts at once, and a fitment change reshapes a whole nested
 document (ADR 5). Price and stock change constantly, one part at a time,
@@ -307,6 +360,8 @@ path can run.
 
 ## ADR 12: Local-first infrastructure; deployment deferred to Tier 3
 
+**Status.** Accepted.
+
 **Context.** The project must run from a fresh clone and in CI with no
 accounts, secrets or cloud costs, and CI must exercise the real Postgres,
 Redis and Elasticsearch rather than mocks.
@@ -325,6 +380,8 @@ cloud service, which keeps a later deployment a packaging problem rather
 than a rewrite.
 
 ## ADR 13: zod via nestjs-zod, with the schemas shared through `packages/contracts`
+
+**Status.** Accepted.
 
 **Context.** The API validates every request and the web app types every
 response. Two definitions of the same body, one per side, drift the moment
@@ -353,6 +410,8 @@ logic.
 
 ## ADR 14: Workspace packages are consumed as TypeScript source
 
+**Status.** Accepted; amended in Phase 4 (import specifiers).
+
 **Context.** `packages/domain` and `packages/contracts` are imported by
 both apps. Publishing compiled output would add a build step before every
 test run and a second copy of every type to keep in sync.
@@ -379,6 +438,8 @@ domain package; the Phase 2 scripts had sidestepped it by running under
 `tsx`.
 
 ## ADR 15: The browser calls the API directly; the URL is the vehicle's one home
+
+**Status.** Accepted; amended in Phase 8 (cart key).
 
 **Context.** The web client (Phase 7) has two kinds of data flow: server
 components render search results and part detail on the server, while
@@ -410,3 +471,9 @@ survive reload and are shareable by link; a client-side navigation to
 boundary streams the shell first and completes the redirect from inside
 the stream. "Send again" is only offered in the tab that placed the
 order, because that is the only tab that has the identical body and key.
+
+_Amended in Phase 8._ The idempotency key belongs to the cart, not to the
+click: the cart store mints one UUID the first time checkout is attempted
+and reuses it until the cart is cleared, so a retry after a failed or lost
+request carries the same key without the visitor doing anything. Clearing
+the cart is the only way to get a new key.

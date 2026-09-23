@@ -1,12 +1,14 @@
 # REST API
 
-The read side of the contract (Tier 1, Phase 4), the import endpoints
-(Phase 5) and the order endpoints (Phase 6). Base URL in development:
+The read side of the contract (Phase 4, suppliers added in Phase 7), the
+import endpoints (Phase 5) and the order endpoints (Phase 6). Base URL in development:
 `http://localhost:4000`. Every body is JSON; every schema lives in
 `packages/contracts` and is the same definition the web app parses
 responses with (ADR 13). Ids are strings, money is integer cents, build
 dates are `YYYY-MM`. All examples below were run against the `small`
-profile; the data is synthetic and every name is invented.
+profile; the data is synthetic and every name is invented. Long arrays in
+the examples are cut to their first entries; the field tables are complete.
+Every example was re-run against the running API for v1.0.0.
 
 ## Errors
 
