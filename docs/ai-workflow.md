@@ -65,6 +65,9 @@ Format: `- <phase> | <what happened> | <what changed as a result>`.
 - P8 | ADR 3 promised a contracts test pinning `ImportRow` to a zod schema "once Phase 4 adds it"; Phase 4 never added one because the API validates supplier rows through the domain directly. The audit found the stale promise, not the code. | Amended ADR 3 rather than adding a schema nothing would use.
 - P8 | The Phase 7 screenshots carried the Next.js dev-mode badge in the corner. | Retaken from the production build that the Lighthouse run needed anyway.
 - P9–11 planning | Asked whether to build all three Tier 2 items in one session on stacked branches, a question the working agreement already answers (one phase, one session, one PR); the author sent it back to "create phases again". | Wrote Phases 9–11 into `PHASES.md` and a Tier 2 design note instead of any code, and this session ends at the planning PR.
+- P9 | The first stock-module commit subject began with `PATCH`, which commitlint rejects as sentence case; the same rule had already cost a Phase 4 commit. | Re-committed with a lowercase subject; the memory note about it now exists for a reason.
+- P9 | Running the new integration file from `apps/api` with `npx dotenv` failed with `DATABASE_URL is not set`: the `.env` lives at the repo root and `dotenv-cli` only reads the current directory. | Ran it from the root as `npx dotenv -- sh -c 'cd apps/api && npx vitest run ...'`; the root `test:integration` script already does this.
+- P9 | The first `docs/api.md` search example used `v_000001` for a part that is not universal and does not fit that variant, so it returned no hit. | Picked the variant from the part's own fitment rows; the integration test avoids the problem by patching universal parts only.
 
 ## Per-phase narrative
 
