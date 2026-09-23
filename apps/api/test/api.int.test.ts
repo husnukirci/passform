@@ -247,7 +247,7 @@ describe("GET /search", () => {
   });
 });
 
-describe("GET /categories and /parts/:sku", () => {
+describe("GET /categories, /suppliers and /parts/:sku", () => {
   it("categories come back as a tree with the leaves under their parents", async () => {
     const response = await api().get("/categories");
     const leaf = await one<{ id: string; parent_id: string }>(
@@ -257,6 +257,15 @@ describe("GET /categories and /parts/:sku", () => {
     expect(response.status).toBe(200);
     const parent = response.body.categories.find((c: { id: string }) => c.id === leaf.parent_id);
     expect(parent.children.map((c: { id: string }) => c.id)).toContain(leaf.id);
+  });
+
+  it("suppliers come back in id order and match the table", async () => {
+    const response = await api().get("/suppliers");
+    const { n } = await one<{ n: number }>(sql`select count(*)::int as n from suppliers`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.suppliers).toHaveLength(n);
+    expect(response.body.suppliers[0]).toEqual({ id: "s_01", name: expect.any(String) });
   });
 
   it("a universal part reports the universal reason for any variant", async () => {

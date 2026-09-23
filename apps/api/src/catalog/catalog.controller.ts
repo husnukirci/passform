@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Query } from "@nestjs/common";
-import { CategoriesResponse, PartDetailResponse } from "@passform/contracts";
+import { CategoriesResponse, PartDetailResponse, SuppliersResponse } from "@passform/contracts";
 import { ZodSerializerDto } from "nestjs-zod";
 
 import { PartDetailQueryDto } from "./catalog.dto.js";
@@ -13,6 +13,12 @@ export class CatalogController {
   @ZodSerializerDto(CategoriesResponse)
   categories(): Promise<CategoriesResponse> {
     return this.catalog.categoryTree();
+  }
+
+  @Get("suppliers")
+  @ZodSerializerDto(SuppliersResponse)
+  suppliers(): Promise<SuppliersResponse> {
+    return this.catalog.supplierList();
   }
 
   @Get("parts/:sku")

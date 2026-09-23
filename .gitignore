@@ -33,3 +33,6 @@ next-env.d.ts
 # rewritten by `next dev` on every start; the working agreement is the root CLAUDE.md
 apps/web/AGENTS.md
 apps/web/CLAUDE.md
+
+# browser QA output (screenshots, console logs) from the Playwright MCP
+.playwright-mcp/

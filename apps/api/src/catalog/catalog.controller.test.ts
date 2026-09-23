@@ -9,10 +9,11 @@ import { ErrorFilter } from "../infra/http/error.filter.js";
 import { CatalogController } from "./catalog.controller.js";
 import { CatalogService } from "./catalog.service.js";
 
-const service: Pick<CatalogService, "categoryTree" | "partDetail"> = {
+const service: Pick<CatalogService, "categoryTree" | "supplierList" | "partDetail"> = {
   categoryTree: async () => ({
     categories: [{ id: "brakes", name: "Brakes", children: [] }],
   }),
+  supplierList: async () => ({ suppliers: [{ id: "s_01", name: "Brenholt Distribution" }] }),
   partDetail: async () => {
     throw new Error("not reached");
   },
@@ -46,6 +47,13 @@ describe("CatalogController", () => {
     expect(response.body).toEqual({
       categories: [{ id: "brakes", name: "Brakes", children: [] }],
     });
+  });
+
+  it("GET /suppliers answers 200 with the list", async () => {
+    const response = await request(app.getHttpServer()).get("/suppliers");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ suppliers: [{ id: "s_01", name: "Brenholt Distribution" }] });
   });
 
   it("GET /parts/:sku answers 400 for an empty variantId", async () => {

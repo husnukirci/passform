@@ -15,6 +15,7 @@ export {
   VehicleVariantDto,
 } from "./vehicles.ts";
 export { CategoriesResponse, CategoryNode } from "./categories.ts";
+export { SupplierDto, SuppliersResponse } from "./suppliers.ts";
 export { FitmentDto, PartDetailQuery, PartDetailResponse, PartDto } from "./parts.ts";
 export { SearchHitDto, SearchQuery, SearchResponse, SearchSort } from "./search.ts";
 export {

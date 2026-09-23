@@ -1,28 +1,20 @@
-import { HealthResponse } from "@passform/contracts";
+import type { Metadata } from "next";
 
-import { ApiError, apiFetch } from "@/lib/api";
+import { VehiclePicker } from "@/components/vehicle/VehiclePicker";
 
-// The page reflects the live API, so it must not be prerendered at build time.
-export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Choose a vehicle" };
 
-async function checkApi(): Promise<string> {
-  try {
-    const health = await apiFetch("/health", HealthResponse);
-    return health.ok ? "api: ok" : "api: unexpected response";
-  } catch (error) {
-    if (error instanceof ApiError) {
-      return `api: error ${error.status}`;
-    }
-    return "api: unreachable";
-  }
-}
-
-export default async function HomePage() {
-  const status = await checkApi();
-
+export default function HomePage() {
   return (
-    <main className="flex flex-1 items-center justify-center p-8">
-      <p className="font-mono text-lg">{status}</p>
-    </main>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Which vehicle?</h1>
+        <p className="mt-1 max-w-prose text-sm text-muted">
+          Parts are filtered by what fits before anything is ranked, so the search starts with the
+          vehicle. Enter its registration key or pick it by make and model.
+        </p>
+      </div>
+      <VehiclePicker />
+    </div>
   );
 }

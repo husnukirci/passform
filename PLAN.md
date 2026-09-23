@@ -101,7 +101,7 @@ rules are pure functions over plain data.
       409 on payload mismatch, conditional stock update, reservations with
       15-minute expiry, `POST /orders/:id/confirm`, `GET /orders/:id`,
       `reservations.release` repeatable job; concurrency tests
-- [ ] Web: `/` vehicle picker + disambiguation, `/parts` results with stage
+- [x] Web: `/` vehicle picker + disambiguation, `/parts` results with stage
       strip and fit badges, `/parts/[sku]`, `/cart`, `/orders/[id]` with
       "send again" and "confirm", `/imports`
 - [ ] Docs: README (arch diagram, quick start, numbers, screenshots),

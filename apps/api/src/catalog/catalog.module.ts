@@ -6,10 +6,11 @@ import { CatalogController } from "./catalog.controller.js";
 import { CatalogService } from "./catalog.service.js";
 import { CategoriesRepository } from "./categories.repository.js";
 import { PartsRepository } from "./parts.repository.js";
+import { SuppliersRepository } from "./suppliers.repository.js";
 
 @Module({
   imports: [DbModule, VehiclesModule],
   controllers: [CatalogController],
-  providers: [CategoriesRepository, PartsRepository, CatalogService],
+  providers: [CategoriesRepository, PartsRepository, SuppliersRepository, CatalogService],
 })
 export class CatalogModule {}
