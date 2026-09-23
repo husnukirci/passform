@@ -17,7 +17,10 @@ export function CartView() {
   const router = useRouter();
   const lineMap = useCartStore((state) => state.lines);
   const pendingKey = useCartStore((state) => state.pendingKey);
-  const { setQty, remove, clear, ensurePendingKey } = useCartStore.getState();
+  const setQty = useCartStore((state) => state.setQty);
+  const remove = useCartStore((state) => state.remove);
+  const clear = useCartStore((state) => state.clear);
+  const ensurePendingKey = useCartStore((state) => state.ensurePendingKey);
   const lines = cartLines(lineMap);
 
   const placeOrder = useMutation({
