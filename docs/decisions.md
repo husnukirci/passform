@@ -6,23 +6,23 @@ Numbered in the order PLAN.md lists them, with two added during the build
 records. Audited for v1.0.0: every entry below is accepted and describes
 the code as shipped.
 
-| ADR | Title                                                                    | Phase | Status                        |
-| --: | ------------------------------------------------------------------------ | ----- | ----------------------------- |
-|   1 | Separate NestJS API and thin Next.js client in one monorepo              | P0    | accepted                      |
-|   2 | Drizzle in NestJS over TypeORM or Prisma                                 | P0    | accepted                      |
-|   3 | Domain core as a pure, isomorphic TypeScript package                     | P1    | accepted, amended in P8       |
-|   4 | Fitment is a filter, never a score                                       | P1    | accepted                      |
-|   5 | Fitments as nested documents on the part                                 | P3    | accepted                      |
-|   6 | Postgres is the source of truth; Elasticsearch is derived, alias-swapped | P3    | accepted                      |
-|   7 | Deterministic generator with size profiles; all names invented           | P2    | accepted                      |
-|   8 | Chunked, idempotent import jobs on BullMQ with a dead-letter queue       | P5    | accepted                      |
-|   9 | Idempotency keys for order creation with stored-response replay          | P6    | accepted, amended in P8       |
-|  10 | Stock reservation by conditional update; expiry as compensation          | P6    | accepted                      |
-|  11 | Slow and fast index paths                                                | P3    | accepted; fast path is Tier 2 |
-|  12 | Local-first infrastructure; deployment deferred to Tier 3                | P0    | accepted                      |
-|  13 | zod via nestjs-zod, schemas shared through `packages/contracts`          | P4    | accepted                      |
-|  14 | Workspace packages are consumed as TypeScript source                     | P0    | accepted, amended in P4       |
-|  15 | The browser calls the API directly; the URL is the vehicle's one home    | P7    | accepted, amended in P8       |
+| ADR | Title                                                                    | Phase | Status                  |
+| --: | ------------------------------------------------------------------------ | ----- | ----------------------- |
+|   1 | Separate NestJS API and thin Next.js client in one monorepo              | P0    | accepted                |
+|   2 | Drizzle in NestJS over TypeORM or Prisma                                 | P0    | accepted                |
+|   3 | Domain core as a pure, isomorphic TypeScript package                     | P1    | accepted, amended in P8 |
+|   4 | Fitment is a filter, never a score                                       | P1    | accepted                |
+|   5 | Fitments as nested documents on the part                                 | P3    | accepted                |
+|   6 | Postgres is the source of truth; Elasticsearch is derived, alias-swapped | P3    | accepted                |
+|   7 | Deterministic generator with size profiles; all names invented           | P2    | accepted                |
+|   8 | Chunked, idempotent import jobs on BullMQ with a dead-letter queue       | P5    | accepted                |
+|   9 | Idempotency keys for order creation with stored-response replay          | P6    | accepted, amended in P8 |
+|  10 | Stock reservation by conditional update; expiry as compensation          | P6    | accepted                |
+|  11 | Slow and fast index paths                                                | P3    | accepted, amended in P9 |
+|  12 | Local-first infrastructure; deployment deferred to Tier 3                | P0    | accepted                |
+|  13 | zod via nestjs-zod, schemas shared through `packages/contracts`          | P4    | accepted                |
+|  14 | Workspace packages are consumed as TypeScript source                     | P0    | accepted, amended in P4 |
+|  15 | The browser calls the API directly; the URL is the vehicle's one home    | P7    | accepted, amended in P8 |
 
 ## ADR 1: Separate NestJS API and thin Next.js client in one monorepo
 
@@ -336,7 +336,7 @@ their lines and reservations as history, with `released_at` set.
 
 ## ADR 11: Slow and fast index paths
 
-**Status.** Accepted; the fast path is a Tier 2 follow-up.
+**Status.** Accepted; amended in P9, when the fast path shipped.
 
 **Context.** Catalogue and fitment changes arrive as supplier files and
 touch many parts at once, and a fitment change reshapes a whole nested
@@ -347,16 +347,45 @@ and are flat fields on the document.
 the only way catalogue and fitment changes reach the index, and the import
 pipeline triggers it once a file has been processed. The fast path is a
 partial document update to the live alias for `price_cents` and `in_stock`
-only; it never touches `fitments`. Tier 1 ships the slow path; the fast
-path is a Tier 2 follow-up and until then price and stock changes also wait
-for the next rebuild.
+only; it never touches `fitments`. Tier 1 shipped the slow path; Phase 9
+added the fast path as `PATCH /suppliers/:id/stock`.
+
+**Amendment (P9).** The fast path is the second step of that request, not
+a queue: Postgres commits first, in one transaction that locks the
+supplier's matching rows with `FOR UPDATE` (the same rows the order
+transaction locks through its conditional update, so the two serialise),
+then one `_bulk` of partial `update` operations goes to the alias with
+`doc: { price_cents, in_stock }` and `refresh: "wait_for"`. Its outcome is
+reported, never thrown: the response is `200` once Postgres has committed,
+and `indexed: false` means the bulk call failed or one of its items did,
+logged with the part ids. A request is safe to retry because every value it
+carries is absolute; the same body twice leaves the same state in both
+stores. A stock delta is small and the caller wants to know it landed,
+which is why it is not a job like an import (ADR 8).
+
+The stored stock is not the reported number. A supplier reports what is on
+its shelf; units held by open reservations on `placed` orders have already
+been taken off `stock_qty` and come back through the release job if the
+order expires (ADR 10), so storing the report as-is would count them
+twice. The stored value is `availableStock(reported, openReservedUnits) =
+max(0, reported − openReservedUnits)`, a pure domain function and the only
+place the subtraction happens; the reservation sum is computed in SQL and
+excludes `confirmed` orders, whose stock never comes back. A price-only row
+leaves the stock untouched.
 
 **Consequences.** Fitment correctness never depends on an incremental
-update getting the nested array right. Search shows stale prices and stock
-for the length of a rebuild until the fast path lands, which the order flow
-tolerates because stock is reserved in Postgres, not in the index. The
-rebuild's cost, measured in `docs/numbers.md`, bounds how often the slow
-path can run.
+update getting the nested array right: the fast path touches exactly two
+flat fields. A price or stock change is visible in search as soon as the
+request returns (`docs/numbers.md`, "Fast path"); catalogue and fitment
+changes still wait for a rebuild, whose cost bounds how often the slow
+path can run. Between a failed index patch and the next rebuild the index
+is stale for those parts, which the order flow tolerates because stock is
+reserved in Postgres, not in the index; a part imported since the last
+rebuild has no document yet, so its patch reports `indexed: false` until
+the rebuild that follows every import. The order transaction and a stock
+delta can, in principle, take the same rows in opposite orders; Postgres
+resolves that by aborting one side, and the aborted request is safe to
+send again.
 
 ## ADR 12: Local-first infrastructure; deployment deferred to Tier 3
 
