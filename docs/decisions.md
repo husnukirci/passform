@@ -169,6 +169,50 @@ changing any rule or name changes every id after it, which is acceptable
 because nothing outside the generated files refers to them. The name file
 is the single place the name scrub has to audit.
 
+## ADR 8: Chunked, idempotent import jobs on BullMQ with a dead-letter queue
+
+**Context.** A supplier file has hundreds of thousands of rows and must be
+imported while search keeps answering. One long job fails as a whole and
+retries from the start; one job per row would put hundreds of thousands of
+entries into Redis and pay a transaction each. Retries and worker restarts
+must never write a row twice, and a bad row must not sink the file.
+
+**Decision.** `POST /imports` splits the file into chunk files of 1,000
+rows under `DATA_DIR/imports/<importId>/` and queues one `import.chunk` job
+per chunk. The job's identity and its payload are the same thing,
+`(importId, seq)`, with `jobId = "<importId>-<seq>"`. The processor loads
+the chunk row and returns at once when it is `done`; otherwise it validates
+every line with the domain rules, rejects rows that point at a category or
+variant Postgres does not have, and in one transaction upserts the surviving
+parts on `sku` (`ON CONFLICT DO UPDATE` on every mutable column, a new SKU
+getting the deterministic id `p_<sku>`), replaces their fitments, adds to
+the import's counters and marks the chunk `done`. Row problems are data:
+they count in `failed_rows` and are reported on the chunk, and the chunk
+still succeeds. A thrown error counts an attempt and is retried with
+exponential backoff, five times; the last failure copies the job to
+`import.chunk.dlq` with the error and the rejected rows attached and marks
+the chunk `failed`. When every chunk is terminal the import becomes
+`completed` if every row is in, otherwise `partial` (a rejected row counts
+as much as a failed chunk), and exactly one `index.rebuild` job
+(`jobId = "rebuild-<importId>"`) runs the Phase 3 rebuild. The worker runs
+four chunks at a time with a limiter of four starts per second.
+
+**Consequences.** Re-running any job is a no-op or an exact repeat: the
+`done` short-circuit covers a retry after the commit, the transaction
+covers a crash before it, and the derived part id covers a retry that
+inserts. Resumption after a worker restart costs nothing because the jobs
+are in Redis and the state is in Postgres. A partial import is a normal
+outcome with counts, not an exception path. The dead-letter queue is read,
+never worked: replaying a chunk means re-adding its identity. The limiter
+bounds the write load an import puts on the shared connection pool and so
+caps throughput at about 4,000 rows per second by design; the measured
+figure is in `docs/numbers.md`. Two paths can notice an import finishing,
+the queue events and the dead-letter handler, and both are safe because the
+terminal status is written conditionally and the rebuild's job id dedupes.
+The chunk files live on local disk, so the worker must share a filesystem
+with the API: true of this local-first stack (ADR 12) and the first thing
+to revisit before the two are deployed apart.
+
 ## ADR 11: Slow and fast index paths
 
 **Context.** Catalogue and fitment changes arrive as supplier files and

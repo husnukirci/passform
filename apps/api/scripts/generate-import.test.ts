@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { generateDataset } from "./generate.js";
 import { generateImportFile, type GenerateImportResult } from "./generate-import.js";
-import { readJsonl } from "./jsonl.js";
+import { readJsonl } from "../src/infra/jsonl.js";
 import type { PartLine } from "./synth.js";
 
 let dir: string;

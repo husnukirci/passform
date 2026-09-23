@@ -17,3 +17,9 @@ export {
 export { CategoriesResponse, CategoryNode } from "./categories.ts";
 export { FitmentDto, PartDetailQuery, PartDetailResponse, PartDto } from "./parts.ts";
 export { SearchHitDto, SearchQuery, SearchResponse, SearchSort } from "./search.ts";
+export {
+  CreateImportBody,
+  CreateImportResponse,
+  ImportStatus,
+  ImportStatusResponse,
+} from "./imports.ts";

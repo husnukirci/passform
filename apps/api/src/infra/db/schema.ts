@@ -27,6 +27,27 @@ export const ORDER_STATUSES = ["placed", "confirmed", "expired"] as const;
 
 export type PartAttributes = Record<string, string | number>;
 
+/** `imports.error`: why the split or the index rebuild failed. */
+export interface ImportError {
+  message: string;
+}
+
+/** One rejected row: its 0-based index in the import file and every problem found. */
+export interface InvalidRow {
+  row: number;
+  errors: string[];
+}
+
+/**
+ * `import_chunks.error`: the rows a chunk rejected (capped, with the full
+ * count) and, when the chunk itself failed, the last error message.
+ */
+export interface ChunkReport {
+  message: string | null;
+  invalidRowCount: number;
+  invalidRows: InvalidRow[];
+}
+
 export const vehicleVariants = pgTable(
   "vehicle_variants",
   {
@@ -127,7 +148,7 @@ export const imports = pgTable("imports", {
   chunkSize: integer("chunk_size").notNull(),
   startedAt: timestamp("started_at", { withTimezone: true }),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
-  error: jsonb("error"),
+  error: jsonb("error").$type<ImportError>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -142,7 +163,7 @@ export const importChunks = pgTable(
     attempts: integer("attempts").notNull().default(0),
     rowFrom: integer("row_from").notNull(),
     rowTo: integer("row_to").notNull(),
-    error: jsonb("error"),
+    error: jsonb("error").$type<ChunkReport>(),
   },
   (t) => [primaryKey({ columns: [t.importId, t.seq] })],
 );

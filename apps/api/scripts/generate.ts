@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 
 import { CATEGORIES } from "./categories.js";
-import { JsonlWriter } from "./jsonl.js";
+import { JsonlWriter } from "../src/infra/jsonl.js";
 import { SUPPLIERS } from "./names.js";
 import { dataDir, userPath } from "./paths.js";
 import { Rng } from "./prng.js";

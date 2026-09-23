@@ -7,7 +7,7 @@ import { validateImportRow } from "@passform/domain";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { generateDataset, type GenerateResult } from "./generate.js";
-import { readJsonl } from "./jsonl.js";
+import { readJsonl } from "../src/infra/jsonl.js";
 import type { PartLine } from "./synth.js";
 
 // The small profile takes well under a second, so the tests generate it
