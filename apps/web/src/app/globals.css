@@ -1,52 +1,91 @@
 @import "tailwindcss";
 
 /*
- * Design tokens. Colour is never the only signal in the UI: every fit badge
- * and job status also carries text. Placeholder values; final in Phase 7.
+ * Design tokens. Every text/background pair below meets WCAG AA (4.5:1);
+ * src/lib/tokens.test.ts checks the pairs against this file. Colour is never
+ * the only signal: every fit badge and job status also carries text.
  */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --surface: #f5f5f5;
+  --border: #d4d4d4;
+  --muted: #525252;
+  --accent: #1d4ed8;
+  --accent-fg: #ffffff;
+  --link: #1d4ed8;
+  --focus: #1d4ed8;
 
-  /* Fit evaluation: fits / ask / no */
-  --fit-ok: #059669; /* emerald 600 */
-  --fit-ask: #d97706; /* amber 600 */
-  --fit-no: #dc2626; /* red 600 */
+  /* Fit evaluation: fits / ask / no. Text on its own badge background. */
+  --fit-ok: #065f46;
+  --fit-ok-bg: #d1fae5;
+  --fit-ask: #92400e;
+  --fit-ask-bg: #fef3c7;
+  --fit-no: #991b1b;
+  --fit-no-bg: #fee2e2;
 
-  /* Import job status: completed / degraded / failed */
-  --job-ok: #059669; /* emerald 600 */
-  --job-warn: #d97706; /* amber 600 */
-  --job-fail: #dc2626; /* red 600 */
+  /* Import and order status: ok / warn / fail share the fit scale on purpose. */
+  --job-ok: var(--fit-ok);
+  --job-ok-bg: var(--fit-ok-bg);
+  --job-warn: var(--fit-ask);
+  --job-warn-bg: var(--fit-ask-bg);
+  --job-fail: var(--fit-no);
+  --job-fail-bg: var(--fit-no-bg);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --surface: #171717;
+    --border: #404040;
+    --muted: #a3a3a3;
+    --accent: #2563eb;
+    --accent-fg: #ffffff;
+    --link: #93c5fd;
+    --focus: #93c5fd;
 
-    --fit-ok: #34d399; /* emerald 400 */
-    --fit-ask: #fbbf24; /* amber 400 */
-    --fit-no: #f87171; /* red 400 */
-
-    --job-ok: #34d399; /* emerald 400 */
-    --job-warn: #fbbf24; /* amber 400 */
-    --job-fail: #f87171; /* red 400 */
+    --fit-ok: #6ee7b7;
+    --fit-ok-bg: #064e3b;
+    --fit-ask: #fcd34d;
+    --fit-ask-bg: #78350f;
+    --fit-no: #fca5a5;
+    --fit-no-bg: #7f1d1d;
   }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-link: var(--link);
+  --color-focus: var(--focus);
   --color-fit-ok: var(--fit-ok);
+  --color-fit-ok-bg: var(--fit-ok-bg);
   --color-fit-ask: var(--fit-ask);
+  --color-fit-ask-bg: var(--fit-ask-bg);
   --color-fit-no: var(--fit-no);
+  --color-fit-no-bg: var(--fit-no-bg);
   --color-job-ok: var(--job-ok);
+  --color-job-ok-bg: var(--job-ok-bg);
   --color-job-warn: var(--job-warn);
+  --color-job-warn-bg: var(--job-warn-bg);
   --color-job-fail: var(--job-fail);
+  --color-job-fail-bg: var(--job-fail-bg);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Visible focus everywhere; keyboard users must see where they are. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
