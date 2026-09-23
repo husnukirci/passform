@@ -107,7 +107,9 @@ export class OrdersRepository {
       totalCents: orderTotalCents(lines),
       createdAt: now,
     });
-    await tx.insert(orderLines).values(lines.map((line) => ({ orderId: id, ...line })));
+    await tx
+      .insert(orderLines)
+      .values(lines.map((line, position) => ({ orderId: id, position, ...line })));
 
     const responseLines: OrderResponse["lines"] = [];
     for (const line of lines) {
@@ -181,7 +183,7 @@ export class OrdersRepository {
         .from(orderLines)
         .innerJoin(parts, eq(parts.id, orderLines.partId))
         .where(eq(orderLines.orderId, id))
-        .orderBy(asc(parts.sku)),
+        .orderBy(asc(orderLines.position)),
       this.db
         .select({ expiresAt: min(stockReservations.expiresAt) })
         .from(stockReservations)

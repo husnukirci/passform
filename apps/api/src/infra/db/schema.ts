@@ -191,6 +191,8 @@ export const orderLines = pgTable(
     partId: text("part_id")
       .notNull()
       .references(() => parts.id),
+    /** 0-based index in the request, so the order reads back in the order it was placed. */
+    position: integer("position").notNull(),
     qty: integer("qty").notNull(),
     unitCents: integer("unit_cents").notNull(),
   },
