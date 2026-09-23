@@ -1,14 +1,12 @@
 # REST API
 
-The read side of the contract (Tier 1, Phase 4) and the import endpoints
-(Phase 5). Base URL in development:
+The read side of the contract (Tier 1, Phase 4), the import endpoints
+(Phase 5) and the order endpoints (Phase 6). Base URL in development:
 `http://localhost:4000`. Every body is JSON; every schema lives in
 `packages/contracts` and is the same definition the web app parses
 responses with (ADR 13). Ids are strings, money is integer cents, build
 dates are `YYYY-MM`. All examples below were run against the `small`
 profile; the data is synthetic and every name is invented.
-
-Orders arrive in Phase 6.
 
 ## Errors
 
@@ -23,7 +21,10 @@ Every non-2xx response is an `ErrorResponse`:
 - `400` — a query parameter failed its schema (`message: "Validation
 failed"`, one issue per field) or a domain rule (for example a malformed
   registration key; the message names the field).
-- `404` — an unknown variant id or part SKU.
+- `404` — an unknown variant id, part SKU, part id, import or order.
+- `409` — an order request that cannot be honoured: an idempotency key
+  reused with a different body, insufficient stock (the body then carries
+  `sku`), or confirming an expired order.
 - `500` — `message: "Internal server error"`; details stay in the API log.
 
 ```sh
@@ -504,7 +505,7 @@ An import runs on the queue (ADR 8): `POST` records it, splits the file
 and answers `202` at once; `GET` reports progress until the status is
 terminal, after which one index rebuild runs and swaps the alias. Bull
 Board at `/admin/queues` shows the `import.chunk`, `index.rebuild` and
-`import.chunk.dlq` queues.
+`import.chunk.dlq` queues, next to the order flow's `reservations.release`.
 
 ### `POST /imports`
 
@@ -620,6 +621,176 @@ Two minutes later:
   "finishedAt": "2026-09-23T08:22:22.485Z",
   "error": null
 }
+```
+
+## Orders
+
+An order reserves stock the moment it is placed and keeps it for fifteen
+minutes; confirming within that window makes the reservation permanent,
+and otherwise the `reservations.release` job (every minute, visible in
+Bull Board) expires the order and puts the stock back (ADR 10). Creation
+is idempotent on a client-chosen key (ADR 9), so a lost response is
+recovered by sending the identical request again.
+
+### `POST /orders`
+
+Header `Idempotency-Key`: required, a UUID the client generates per
+checkout attempt and reuses for every retry of it.
+
+JSON body `CreateOrderBody`:
+
+| Field            | Required | Notes                                      |
+| ---------------- | -------- | ------------------------------------------ |
+| `lines`          | yes      | At least one; `partId` unique across lines |
+| `lines[].partId` | yes      | An existing part id                        |
+| `lines[].qty`    | yes      | Integer ≥ 1                                |
+
+Unit prices are the parts' current prices at the moment of placing;
+`totalCents` is their sum over the quantities. Stock is taken per line by a
+conditional update, so a line for more than is in stock fails the whole
+order and nothing is reserved.
+
+Response: `201` with `OrderResponse` on first receipt; `200` with the
+**stored** body of the first receipt when the same key arrives again with
+the same body, byte for byte, however the order has moved on since.
+
+| Field         | Type                                      | Notes                                        |
+| ------------- | ----------------------------------------- | -------------------------------------------- |
+| `id`          | string                                    | `ord_<hex>`                                  |
+| `status`      | `placed` \| `confirmed` \| `expired`      |                                              |
+| `totalCents`  | integer                                   |                                              |
+| `lines`       | `{ partId, sku, name, qty, unitCents }[]` | In the order they were sent                  |
+| `expiresAt`   | ISO timestamp                             | When the reservation lapses unless confirmed |
+| `confirmedAt` | ISO timestamp \| null                     |                                              |
+
+Errors (`OrderErrorResponse`, an `ErrorResponse` that may carry `sku`):
+`400` without the header, with one that is not a UUID, or for a body that
+fails the schema; `404` for a `partId` that does not exist; `409` when the
+key was already used with a different body (`message: "Idempotency-Key
+reused with a different payload"`); `409` with `sku` when a line's part
+has too little stock.
+
+```sh
+curl -H 'content-type: application/json' \
+  -H 'Idempotency-Key: 0b4f0e2a-6d3c-4f5e-9a1b-2c3d4e5f6a7b' \
+  -d '{"lines":[{"partId":"p_0000001","qty":2},{"partId":"p_0000002","qty":1}]}' \
+  localhost:4000/orders
+```
+
+First receipt, `201`:
+
+```json
+{
+  "id": "ord_ce6b109911d8",
+  "status": "placed",
+  "totalCents": 16120,
+  "lines": [
+    {
+      "partId": "p_0000001",
+      "sku": "LOR-0000001",
+      "name": "Lorrexa Bushings U696",
+      "qty": 2,
+      "unitCents": 7420
+    },
+    {
+      "partId": "p_0000002",
+      "sku": "DUN-0000002",
+      "name": "Dunmoor Tail lamps F528",
+      "qty": 1,
+      "unitCents": 1280
+    }
+  ],
+  "expiresAt": "2026-09-23T09:00:50.501Z",
+  "confirmedAt": null
+}
+```
+
+The same command again: `200` with exactly the body above. The same key
+with `"qty": 3`:
+
+```json
+{ "statusCode": 409, "message": "Idempotency-Key reused with a different payload" }
+```
+
+A line for more than is in stock, under a fresh key:
+
+```json
+{ "statusCode": 409, "message": "Insufficient stock for DUN-0000002", "sku": "DUN-0000002" }
+```
+
+```sh
+curl -H 'content-type: application/json' \
+  -d '{"lines":[{"partId":"p_0000001","qty":1}]}' localhost:4000/orders
+```
+
+```json
+{ "statusCode": 400, "message": "Idempotency-Key header is required" }
+```
+
+### `POST /orders/:id/confirm`
+
+The payment stand-in. A `placed` order becomes `confirmed` and its stock
+stays taken. Response: `200` with the current `OrderResponse`; confirming
+an order that is already `confirmed` is `200` again with the same
+confirmation.
+
+Errors: `404` for an unknown order; `409` `"Order has expired"` when the
+release job got there first.
+
+```sh
+curl -X POST localhost:4000/orders/ord_ce6b109911d8/confirm
+```
+
+```json
+{
+  "id": "ord_ce6b109911d8",
+  "status": "confirmed",
+  "totalCents": 16120,
+  "lines": [
+    {
+      "partId": "p_0000001",
+      "sku": "LOR-0000001",
+      "name": "Lorrexa Bushings U696",
+      "qty": 2,
+      "unitCents": 7420
+    },
+    {
+      "partId": "p_0000002",
+      "sku": "DUN-0000002",
+      "name": "Dunmoor Tail lamps F528",
+      "qty": 1,
+      "unitCents": 1280
+    }
+  ],
+  "expiresAt": "2026-09-23T09:00:50.501Z",
+  "confirmedAt": "2026-09-23T08:45:50.739Z"
+}
+```
+
+```sh
+curl -X POST localhost:4000/orders/ord_e71f82f375bc/confirm
+```
+
+An order the release job has expired:
+
+```json
+{ "statusCode": 409, "message": "Order has expired" }
+```
+
+### `GET /orders/:id`
+
+The order as it is now, `OrderResponse`: `status` and `confirmedAt` move
+with confirmation and expiry, unlike the stored body a replayed `POST`
+returns.
+
+Errors: `404` for an unknown order.
+
+```sh
+curl localhost:4000/orders/ord_nope
+```
+
+```json
+{ "statusCode": 404, "message": "order ord_nope not found" }
 ```
 
 ## Health

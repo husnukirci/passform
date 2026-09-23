@@ -1,7 +1,8 @@
 // Every error leaves the API as an `ErrorResponse` (ADR 13). A domain rule
 // violation and a failed zod parse are both the caller's fault, so both are
 // 400; Nest's own HTTP exceptions keep their status; anything else is a 500
-// whose details stay in the log.
+// whose details stay in the log. An HTTP exception raised with an object
+// may name a `sku`, which the order flow's 409 carries (`OrderErrorResponse`).
 
 import {
   type ArgumentsHost,
@@ -10,7 +11,7 @@ import {
   HttpException,
   Logger,
 } from "@nestjs/common";
-import type { ErrorResponse } from "@passform/contracts";
+import type { OrderErrorResponse } from "@passform/contracts";
 import { DomainError } from "@passform/domain";
 import type { Response } from "express";
 import { ZodValidationException } from "nestjs-zod";
@@ -25,7 +26,7 @@ export class ErrorFilter implements ExceptionFilter {
     host.switchToHttp().getResponse<Response>().status(body.statusCode).json(body);
   }
 
-  private toResponse(exception: unknown): ErrorResponse {
+  private toResponse(exception: unknown): OrderErrorResponse {
     if (exception instanceof ZodValidationException) {
       const error = exception.getZodError();
       const issues =
@@ -38,11 +39,17 @@ export class ErrorFilter implements ExceptionFilter {
       return { statusCode: 400, message: exception.message };
     }
     if (exception instanceof HttpException) {
-      return { statusCode: exception.getStatus(), message: exception.message };
+      const sku = skuOf(exception.getResponse());
+      return { statusCode: exception.getStatus(), message: exception.message, ...(sku && { sku }) };
     }
     this.logger.error(
       exception instanceof Error ? (exception.stack ?? exception.message) : exception,
     );
     return { statusCode: 500, message: "Internal server error" };
   }
+}
+
+function skuOf(response: string | object): string | undefined {
+  if (typeof response !== "object" || !("sku" in response)) return undefined;
+  return typeof response.sku === "string" ? response.sku : undefined;
 }

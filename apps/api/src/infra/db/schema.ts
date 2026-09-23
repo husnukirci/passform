@@ -2,6 +2,7 @@
 // snake_case; the domain never sees them (see mappers.ts). Build dates are
 // `YYYY-MM` strings stored as char(7), money is integer cents.
 
+import type { OrderResponse } from "@passform/contracts";
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
@@ -176,7 +177,7 @@ export const orders = pgTable("orders", {
   status: text("status", { enum: ORDER_STATUSES }).notNull(),
   totalCents: integer("total_cents").notNull(),
   /** The stored response body, replayed on an idempotent retry. */
-  response: jsonb("response"),
+  response: jsonb("response").$type<OrderResponse>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
 });
@@ -190,6 +191,8 @@ export const orderLines = pgTable(
     partId: text("part_id")
       .notNull()
       .references(() => parts.id),
+    /** 0-based index in the request, so the order reads back in the order it was placed. */
+    position: integer("position").notNull(),
     qty: integer("qty").notNull(),
     unitCents: integer("unit_cents").notNull(),
   },
