@@ -8,9 +8,46 @@ import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bullmq";
 import type { JobsOptions, RedisOptions } from "bullmq";
 
+import type { InvalidRow } from "./db/schema.js";
+
 export const IMPORT_CHUNK = "import.chunk";
 export const INDEX_REBUILD = "index.rebuild";
 export const IMPORT_CHUNK_DLQ = "import.chunk.dlq";
+
+/** Job payloads carry identities only; the processor loads everything else from Postgres. */
+export interface ChunkJob {
+  importId: string;
+  seq: number;
+}
+
+export interface RebuildJob {
+  importId: string;
+}
+
+/**
+ * A dead letter is a record, not work: it keeps the final error and the
+ * rows the chunk had rejected so the failure can be read in Bull Board
+ * without opening Postgres.
+ */
+export interface DeadLetter extends ChunkJob {
+  error: string;
+  invalidRows: InvalidRow[];
+}
+
+/** `<importId>:<seq>`, so re-adding a chunk's job is a no-op while the first is kept. */
+export function chunkJobId({ importId, seq }: ChunkJob): string {
+  return `${importId}:${seq}`;
+}
+
+export function importIdOfChunkJob(jobId: string): string {
+  const at = jobId.lastIndexOf(":");
+  return at === -1 ? jobId : jobId.slice(0, at);
+}
+
+/** One rebuild per import, however many listeners notice the import finishing. */
+export function rebuildJobId(importId: string): string {
+  return `rebuild:${importId}`;
+}
 
 /** ioredis options parsed from REDIS_URL; BullMQ adds the blocking-connection settings itself. */
 export function redisConnection(): RedisOptions {
