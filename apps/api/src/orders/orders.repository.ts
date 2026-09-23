@@ -9,7 +9,7 @@ import { randomBytes } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import type { OrderResponse } from "@passform/contracts";
 import { type OrderLineInput, orderTotalCents, reservationExpiresAt } from "@passform/domain";
-import { and, asc, eq, gte, inArray, min, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lt, min, sql } from "drizzle-orm";
 import pg from "pg";
 
 import { type Db } from "../infra/db/client.js";
@@ -99,12 +99,13 @@ export class OrdersRepository {
     const id = newOrderId();
     const now = new Date();
     const expiresAt = reservationExpiresAt(now);
+    const totalCents = orderTotalCents(lines);
     await tx.insert(orders).values({
       id,
       idempotencyKey: key,
       payloadHash,
       status: "placed",
-      totalCents: orderTotalCents(lines),
+      totalCents,
       createdAt: now,
     });
     await tx
@@ -138,7 +139,7 @@ export class OrdersRepository {
     const order: OrderResponse = {
       id,
       status: "placed",
-      totalCents: orderTotalCents(lines),
+      totalCents,
       lines: responseLines,
       expiresAt: expiresAt.toISOString(),
       confirmedAt: null,
@@ -235,8 +236,8 @@ export class OrdersRepository {
                 .from(stockReservations)
                 .where(
                   and(
-                    sql`${stockReservations.releasedAt} is null`,
-                    sql`${stockReservations.expiresAt} < now()`,
+                    isNull(stockReservations.releasedAt),
+                    lt(stockReservations.expiresAt, sql`now()`),
                   ),
                 ),
             ),
@@ -254,7 +255,7 @@ export class OrdersRepository {
               stockReservations.orderId,
               expired.map((row) => row.id),
             ),
-            sql`${stockReservations.releasedAt} is null`,
+            isNull(stockReservations.releasedAt),
           ),
         )
         .returning({ partId: stockReservations.partId, qty: stockReservations.qty });

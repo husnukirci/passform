@@ -505,7 +505,7 @@ An import runs on the queue (ADR 8): `POST` records it, splits the file
 and answers `202` at once; `GET` reports progress until the status is
 terminal, after which one index rebuild runs and swaps the alias. Bull
 Board at `/admin/queues` shows the `import.chunk`, `index.rebuild` and
-`import.chunk.dlq` queues.
+`import.chunk.dlq` queues, next to the order flow's `reservations.release`.
 
 ### `POST /imports`
 
