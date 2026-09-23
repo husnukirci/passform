@@ -180,7 +180,7 @@ must never write a row twice, and a bad row must not sink the file.
 **Decision.** `POST /imports` splits the file into chunk files of 1,000
 rows under `DATA_DIR/imports/<importId>/` and queues one `import.chunk` job
 per chunk. The job's identity and its payload are the same thing,
-`(importId, seq)`, with `jobId = "<importId>:<seq>"`. The processor loads
+`(importId, seq)`, with `jobId = "<importId>-<seq>"`. The processor loads
 the chunk row and returns at once when it is `done`; otherwise it validates
 every line with the domain rules, rejects rows that point at a category or
 variant Postgres does not have, and in one transaction upserts the surviving
@@ -192,8 +192,9 @@ still succeeds. A thrown error counts an attempt and is retried with
 exponential backoff, five times; the last failure copies the job to
 `import.chunk.dlq` with the error and the rejected rows attached and marks
 the chunk `failed`. When every chunk is terminal the import becomes
-`completed` or `partial` and exactly one `index.rebuild` job
-(`jobId = "rebuild:<importId>"`) runs the Phase 3 rebuild. The worker runs
+`completed` if every row is in, otherwise `partial` (a rejected row counts
+as much as a failed chunk), and exactly one `index.rebuild` job
+(`jobId = "rebuild-<importId>"`) runs the Phase 3 rebuild. The worker runs
 four chunks at a time with a limiter of four starts per second.
 
 **Consequences.** Re-running any job is a no-op or an exact repeat: the

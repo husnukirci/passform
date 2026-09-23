@@ -79,8 +79,8 @@ describe("ImportsService.create", () => {
       addBulk.mock.invocationCallOrder[0] ?? 0,
     );
     expect(addBulk).toHaveBeenCalledWith([
-      { name: "chunk", data: { importId, seq: 0 }, opts: { jobId: `${importId}:0` } },
-      { name: "chunk", data: { importId, seq: 1 }, opts: { jobId: `${importId}:1` } },
+      { name: "chunk", data: { importId, seq: 0 }, opts: { jobId: `${importId}-0` } },
+      { name: "chunk", data: { importId, seq: 1 }, opts: { jobId: `${importId}-1` } },
     ]);
     expect(repository.finish).not.toHaveBeenCalled();
   });

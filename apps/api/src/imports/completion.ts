@@ -26,15 +26,20 @@ export class ImportCompletion {
     @InjectQueue(INDEX_REBUILD) private readonly rebuilds: Queue<RebuildJob>,
   ) {}
 
-  /** Finishes the import when nothing is pending; otherwise does nothing. */
+  /**
+   * Finishes the import when nothing is pending; otherwise does nothing.
+   * `completed` means every row is in: a rejected row makes the import
+   * `partial` just as a failed chunk does.
+   */
   async check(importId: string): Promise<void> {
-    const outcomes = await this.imports.chunkOutcomes(importId);
-    if (outcomes.pending > 0) return;
+    const summary = await this.imports.summary(importId);
+    if (summary === null || summary.chunks.pending > 0) return;
 
-    await this.imports.finish(importId, outcomes.failed > 0 ? "partial" : "completed");
+    const partial = summary.chunks.failed > 0 || summary.failedRows > 0;
+    await this.imports.finish(importId, partial ? "partial" : "completed");
     await this.rebuilds.add("rebuild", { importId }, { jobId: rebuildJobId(importId) });
     this.logger.log(
-      `${importId}: ${outcomes.done} chunks done, ${outcomes.failed} failed, rebuild queued`,
+      `${importId}: ${summary.chunks.done} chunks done, ${summary.chunks.failed} failed, ${summary.failedRows} rows rejected, rebuild queued`,
     );
   }
 }

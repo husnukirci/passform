@@ -164,7 +164,7 @@ describe("ChunkProcessor.onFailed", () => {
     expect(deadLetters.add).toHaveBeenCalledWith(
       "chunk",
       { importId: "imp_1", seq: 0, error: "boom", invalidRows: [{ row: 3, errors: ["x"] }] },
-      { jobId: "imp_1:0" },
+      { jobId: "imp_1-0" },
     );
     expect(completion.check).toHaveBeenCalledWith("imp_1");
   });

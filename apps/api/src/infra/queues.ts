@@ -4,11 +4,18 @@
 // then dead-letters; a rebuild runs once per import and reports through
 // the import row; the dead-letter queue has no worker and exists to be read.
 
-import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bullmq";
-import type { JobsOptions, RedisOptions } from "bullmq";
+import { Module } from "@nestjs/common";
+import { createIORedisClient, type JobsOptions, RedisConnection, type RedisOptions } from "bullmq";
+import { Redis } from "ioredis";
 
 import type { InvalidRow } from "./db/schema.js";
+
+// BullMQ 6 treats ioredis as an optional driver and loads it with `require`,
+// which a native ES module does not have. The factory hands it a client for
+// every connection it opens itself (queues, workers' blocking connections,
+// queue events), with the options BullMQ has already adjusted for blocking.
+RedisConnection.clientFactory = (options) => createIORedisClient(new Redis(options));
 
 export const IMPORT_CHUNK = "import.chunk";
 export const INDEX_REBUILD = "index.rebuild";
@@ -34,19 +41,23 @@ export interface DeadLetter extends ChunkJob {
   invalidRows: InvalidRow[];
 }
 
-/** `<importId>:<seq>`, so re-adding a chunk's job is a no-op while the first is kept. */
+/**
+ * `<importId>-<seq>`, so re-adding a chunk's job is a no-op while the first
+ * is kept. A hyphen because BullMQ reserves the colon in job ids, and import
+ * ids (`imp_<hex>`) never contain one.
+ */
 export function chunkJobId({ importId, seq }: ChunkJob): string {
-  return `${importId}:${seq}`;
+  return `${importId}-${seq}`;
 }
 
 export function importIdOfChunkJob(jobId: string): string {
-  const at = jobId.lastIndexOf(":");
+  const at = jobId.lastIndexOf("-");
   return at === -1 ? jobId : jobId.slice(0, at);
 }
 
 /** One rebuild per import, however many listeners notice the import finishing. */
 export function rebuildJobId(importId: string): string {
-  return `rebuild:${importId}`;
+  return `rebuild-${importId}`;
 }
 
 /** ioredis options parsed from REDIS_URL; BullMQ adds the blocking-connection settings itself. */
