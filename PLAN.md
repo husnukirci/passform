@@ -110,12 +110,19 @@ rules are pure functions over plain data.
 
 ### Tier 2 — follow-ups
 
-- [ ] DynamoDB append-only event log (search impressions, orders, returns)
-      via LocalStack, and the return-rate feedback view that names parts
-      whose fitment data to distrust
+Designed on 2026-09-23 as Phases 9–11 (`PHASES.md`; design note
+`docs/superpowers/specs/2026-09-23-tier-2-design.md`), in build order:
+
 - [ ] Supplier price-and-stock partial-update endpoint exercising the fast
-      index path (partial document updates, no rebuild)
-- [ ] Saved vehicles (cookie-backed list, no auth)
+      index path (partial document updates, no rebuild); the stored stock
+      subtracts open reservations so the release job cannot double-count
+      (P9)
+- [ ] Saved vehicles (cookie-backed list of ids, no auth; labels always
+      from the API) (P10)
+- [ ] DynamoDB append-only event log (search impressions, orders, returns)
+      on `amazon/dynamodb-local`, orders that know their vehicle, a returns
+      endpoint, and the return-rate feedback view that names parts whose
+      fitment data to distrust (P11)
 
 ### Tier 3 — stretch
 
@@ -143,6 +150,9 @@ then starts the next phase in a fresh session.
 | P6    | Orders: idempotent transaction, conditional stock, reservations + release job, confirm; concurrency tests | feat(orders)    |
 | P7    | Web: vehicle picker, results with stage strip, detail, cart, order replay/confirm, imports page | feat(web)       |
 | P8    | Docs, ADR audit, ai-workflow finalize, README numbers + screenshots, name scrub, v1 tag  | docs            |
+| P9    | Tier 2: supplier price-and-stock endpoint on the fast index path, reservation-aware stock | feat(stock)     |
+| P10   | Tier 2: saved vehicles in a cookie, save toggle, one-click select on the home page       | feat(web)       |
+| P11   | Tier 2: DynamoDB event log, orders with vehicle, returns endpoint, return-rate feedback   | feat(events)    |
 
 Each phase lands green (unit + integration tests, typecheck, lint, build)
 before the next starts.

@@ -64,6 +64,7 @@ Format: `- <phase> | <what happened> | <what changed as a result>`.
 - P8 | The first expiry check sent two updates in one `psql -c` call and the second named an `expires_at` column that `orders` does not have, so both rolled back and the order sat `placed` for the whole 80-second wait. | Backdated the reservation row alone; the release job expired the order 56 s later and confirm answered `409` as the document says.
 - P8 | ADR 3 promised a contracts test pinning `ImportRow` to a zod schema "once Phase 4 adds it"; Phase 4 never added one because the API validates supplier rows through the domain directly. The audit found the stale promise, not the code. | Amended ADR 3 rather than adding a schema nothing would use.
 - P8 | The Phase 7 screenshots carried the Next.js dev-mode badge in the corner. | Retaken from the production build that the Lighthouse run needed anyway.
+- P9–11 planning | Asked whether to build all three Tier 2 items in one session on stacked branches, a question the working agreement already answers (one phase, one session, one PR); the author sent it back to "create phases again". | Wrote Phases 9–11 into `PHASES.md` and a Tier 2 design note instead of any code, and this session ends at the planning PR.
 
 ## Per-phase narrative
 
