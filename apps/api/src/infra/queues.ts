@@ -88,7 +88,10 @@ export function importChunkJobOptions(): JobsOptions {
   };
 }
 
-/** Four chunks in flight and at most four started per second, so an import cannot starve the read path's pool. */
+/**
+ * Four chunks in flight and at most four started per second, so an import
+ * cannot starve the read path's connection pool.
+ */
 export const IMPORT_CHUNK_WORKER = { concurrency: 4, limiter: { max: 4, duration: 1000 } } as const;
 
 function integerEnv(name: string, fallback: number): number {
@@ -100,7 +103,7 @@ function integerEnv(name: string, fallback: number): number {
   return value;
 }
 
-/** Connection and the three queues, read lazily so nothing touches the environment at import time. */
+/** The connection and the three queues; read lazily so importing this touches no environment. */
 @Module({
   imports: [
     BullModule.forRootAsync({ useFactory: () => ({ connection: redisConnection() }) }),

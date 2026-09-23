@@ -38,8 +38,10 @@ export class ImportCompletion {
     const partial = summary.chunks.failed > 0 || summary.failedRows > 0;
     await this.imports.finish(importId, partial ? "partial" : "completed");
     await this.rebuilds.add("rebuild", { importId }, { jobId: rebuildJobId(importId) });
+    const { done, failed } = summary.chunks;
+    const rejected = summary.failedRows;
     this.logger.log(
-      `${importId}: ${summary.chunks.done} chunks done, ${summary.chunks.failed} failed, ${summary.failedRows} rows rejected, rebuild queued`,
+      `${importId}: ${done} chunks done, ${failed} failed, ${rejected} rows rejected, rebuilding`,
     );
   }
 }

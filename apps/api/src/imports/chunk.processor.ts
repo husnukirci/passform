@@ -69,9 +69,8 @@ export class ChunkProcessor extends WorkerHost {
         { importId, seq, error: error.message, invalidRows: chunk?.report?.invalidRows ?? [] },
         { jobId: chunkJobId(job.data) },
       );
-      this.logger.warn(
-        `${chunkJobId(job.data)} dead-lettered after ${job.attemptsMade} attempts: ${error.message}`,
-      );
+      const id = chunkJobId(job.data);
+      this.logger.warn(`${id} dead-lettered after ${job.attemptsMade} attempts: ${error.message}`);
       await this.completion.check(importId);
     } catch (handlerError) {
       this.logger.error(

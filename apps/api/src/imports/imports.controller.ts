@@ -37,7 +37,7 @@ const uploadStorage = multer.diskStorage({
 export class ImportsController {
   constructor(private readonly imports: ImportsService) {}
 
-  /** JSON `{ supplierId, path }` for a file under DATA_DIR, or multipart `file` plus `supplierId`. */
+  /** JSON `{ supplierId, path }` for a file under DATA_DIR, or multipart `file` + `supplierId`. */
   @Post()
   @HttpCode(202)
   @UseInterceptors(FileInterceptor("file", { storage: uploadStorage }))
