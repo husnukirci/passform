@@ -213,6 +213,76 @@ The chunk files live on local disk, so the worker must share a filesystem
 with the API: true of this local-first stack (ADR 12) and the first thing
 to revisit before the two are deployed apart.
 
+## ADR 9: Idempotency keys for order creation with stored-response replay
+
+**Context.** A client that loses the response to `POST /orders` (timeout,
+dropped connection, a double click) sends the request again. The second
+receipt must not place a second order, and the client must get back the
+same answer it would have got the first time, including the order id.
+Two copies of the same request can also arrive at once.
+
+**Decision.** Every `POST /orders` carries an `Idempotency-Key` header, a
+client-chosen UUID; without one the request is a `400`. The key is a
+unique column on `orders`, stored in the same transaction as the order.
+The first statement of that transaction is
+`SELECT pg_advisory_xact_lock(hashtext($key))`, so concurrent requests
+with one key queue behind the first and each later one finds the row it
+wrote. The row keeps `payload_hash`, a sha256 of the body's canonical JSON
+(keys sorted at every depth, no whitespace; the domain's `canonicalJson`,
+hashed in the service), and `response`, the exact body the first receipt
+answered with. A replay with the same hash returns that stored body with
+`200`, never a recomputed one; the same key with a different hash is a
+`409`. The unique index is the backstop: a unique violation, which the
+lock should make impossible, is treated as a replay after re-reading.
+
+**Consequences.** A retry is safe at any point, including after the
+server committed but before the client heard. The replayed body is
+byte-identical to the original, which the web client relies on to show
+"one order, visibly". Replay answers do not reflect later state (a
+confirmed order replays as `placed`); `GET /orders/:id` is the current
+view. The lock keys on a hash of the key, so two different keys can share
+a lock slot and briefly serialise for no reason, which costs latency and
+never correctness. Keys are never expired, so the table remembers every
+order ever placed under one; a retention rule belongs to a later tier.
+
+## ADR 10: Stock reservation by conditional update; expiry as compensation
+
+**Context.** Two buyers can race for the last unit. Reading the stock and
+then writing it lets both read the same number; an application lock
+around the pair serialises every order on the process that holds it and
+breaks with a second process. An order that is placed and never paid
+must give its stock back without a person noticing.
+
+**Decision.** Stock is taken with
+`UPDATE parts SET stock_qty = stock_qty - $qty WHERE id = $id AND stock_qty >= $qty`,
+one statement per line, inside the order transaction, and the code checks
+the row count: zero rows means the stock is gone, the transaction rolls
+back and the answer is `409` naming the SKU. Postgres' row lock serialises
+the racing updates and the loser's predicate is re-evaluated against the
+winner's value, so no application lock exists. Each line that succeeds
+writes a `stock_reservations` row with `expires_at` fifteen minutes out
+(the domain's `reservationExpiresAt`). `POST /orders/:id/confirm` is the
+payment stand-in: `placed` becomes `confirmed` by a conditional update and
+the stock stays taken. A repeatable `reservations.release` job runs every
+minute under one fixed scheduler id (`upsertJobScheduler`, so any number
+of API processes register the same single schedule) and, in one
+transaction, moves every `placed` order with an unreleased reservation
+past its expiry to `expired`, marks the reservations released and adds
+their quantities back. `confirmed` is excluded by the status predicate in
+SQL, and the order update runs before the release, so a confirmation that
+commits first keeps its stock.
+
+**Consequences.** Over-selling is impossible by construction: the check
+and the decrement are one atomic statement and the `stock_qty >= 0` check
+constraint is a second line of defence. An abandoned checkout is a
+business outcome with a status and a timestamp, not an infrastructure
+failure; stock is back within a minute of the expiry. The release job is
+idempotent, so a duplicate run or a run that overlaps a confirmation
+touches nothing it should not. Reserved stock is invisible to search
+until the next index rebuild (ADR 11), so a result can show in stock and
+then answer `409`; the fast path is the Tier 2 fix. Expired orders keep
+their lines and reservations as history, with `released_at` set.
+
 ## ADR 11: Slow and fast index paths
 
 **Context.** Catalogue and fitment changes arrive as supplier files and

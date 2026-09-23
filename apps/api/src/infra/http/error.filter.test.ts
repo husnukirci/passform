@@ -1,4 +1,11 @@
-import { Controller, Get, type INestApplication, NotFoundException, Query } from "@nestjs/common";
+import {
+  ConflictException,
+  Controller,
+  Get,
+  type INestApplication,
+  NotFoundException,
+  Query,
+} from "@nestjs/common";
 import { APP_FILTER, APP_PIPE } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
 import { DomainError } from "@passform/domain";
@@ -26,6 +33,11 @@ class BoomController {
   @Get("http")
   http(): never {
     throw new NotFoundException("variant v_nope not found");
+  }
+
+  @Get("sku")
+  sku(): never {
+    throw new ConflictException({ message: "Insufficient stock for QB-1001", sku: "QB-1001" });
   }
 
   @Get("crash")
@@ -79,6 +91,17 @@ describe("ErrorFilter", () => {
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ statusCode: 404, message: "variant v_nope not found" });
+  });
+
+  it("carries the sku an HTTP exception names, and nothing else from its object", async () => {
+    const response = await request(app.getHttpServer()).get("/boom/sku");
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      statusCode: 409,
+      message: "Insufficient stock for QB-1001",
+      sku: "QB-1001",
+    });
   });
 
   it("hides the details of anything else behind a 500", async () => {

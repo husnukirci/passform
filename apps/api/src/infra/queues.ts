@@ -3,6 +3,7 @@
 // queues because they fail differently: a chunk retries with backoff and
 // then dead-letters; a rebuild runs once per import and reports through
 // the import row; the dead-letter queue has no worker and exists to be read.
+// A fourth queue carries the order flow's repeatable release job (ADR 10).
 
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
@@ -20,6 +21,7 @@ RedisConnection.clientFactory = (options) => createIORedisClient(new Redis(optio
 export const IMPORT_CHUNK = "import.chunk";
 export const INDEX_REBUILD = "index.rebuild";
 export const IMPORT_CHUNK_DLQ = "import.chunk.dlq";
+export const RESERVATIONS_RELEASE = "reservations.release";
 
 /** Job payloads carry identities only; the processor loads everything else from Postgres. */
 export interface ChunkJob {
@@ -103,7 +105,7 @@ function integerEnv(name: string, fallback: number): number {
   return value;
 }
 
-/** The connection and the three queues; read lazily so importing this touches no environment. */
+/** The connection and the four queues; read lazily so importing this touches no environment. */
 @Module({
   imports: [
     BullModule.forRootAsync({ useFactory: () => ({ connection: redisConnection() }) }),
@@ -111,7 +113,11 @@ function integerEnv(name: string, fallback: number): number {
       name: IMPORT_CHUNK,
       useFactory: () => ({ defaultJobOptions: importChunkJobOptions() }),
     }),
-    BullModule.registerQueue({ name: INDEX_REBUILD }, { name: IMPORT_CHUNK_DLQ }),
+    BullModule.registerQueue(
+      { name: INDEX_REBUILD },
+      { name: IMPORT_CHUNK_DLQ },
+      { name: RESERVATIONS_RELEASE },
+    ),
   ],
   exports: [BullModule],
 })

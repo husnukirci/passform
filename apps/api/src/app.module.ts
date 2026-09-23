@@ -8,6 +8,7 @@ import { CatalogModule } from "./catalog/catalog.module.js";
 import { HealthController } from "./health/health.controller.js";
 import { ImportsModule } from "./imports/imports.module.js";
 import { ErrorFilter } from "./infra/http/error.filter.js";
+import { OrdersModule } from "./orders/orders.module.js";
 import { SearchModule } from "./search/search.module.js";
 import { VehiclesModule } from "./vehicles/vehicles.module.js";
 
@@ -17,6 +18,7 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
     CatalogModule,
     SearchModule,
     ImportsModule,
+    OrdersModule,
     // The queue dashboard; unauthenticated by design in this local-first stack (ADR 12).
     BullBoardModule.forRoot({ route: "/admin/queues", adapter: ExpressAdapter }),
   ],
