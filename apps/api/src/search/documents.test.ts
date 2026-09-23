@@ -1,7 +1,7 @@
 import type { Fitment, Part } from "@passform/domain";
 import { describe, expect, it } from "vitest";
 
-import { partToDocument } from "./documents.js";
+import { inStockOf, partToDocument } from "./documents.js";
 
 const part: Part = {
   id: "p_0000001",
@@ -78,5 +78,14 @@ describe("partToDocument", () => {
 
     expect(document.universal).toBe(true);
     expect(document.fitments).toEqual([]);
+  });
+});
+
+describe("inStockOf", () => {
+  it("is true for any positive stock and false at zero, the rule partToDocument uses", () => {
+    expect(inStockOf(1)).toBe(true);
+    expect(inStockOf(12)).toBe(true);
+    expect(inStockOf(0)).toBe(false);
+    expect(partToDocument({ ...part, stockQty: 0 }, ["brakes"], []).in_stock).toBe(false);
   });
 });

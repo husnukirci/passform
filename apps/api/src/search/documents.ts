@@ -31,6 +31,11 @@ export interface PartDocument {
   fitments: FitmentDocument[];
 }
 
+/** The one rule for `in_stock`; the rebuild and the fast path (ADR 11) both derive it here. */
+export function inStockOf(stockQty: number): boolean {
+  return stockQty > 0;
+}
+
 export function partToDocument(
   part: Part,
   categoryPath: string[],
@@ -45,7 +50,7 @@ export function partToDocument(
     oe_ref: part.oeRef,
     attributes: { ...part.attributes },
     price_cents: part.priceCents,
-    in_stock: part.stockQty > 0,
+    in_stock: inStockOf(part.stockQty),
     universal: part.universal,
     fitments: fitments.map((fitment) => ({
       variant_id: fitment.variantId,
