@@ -97,7 +97,7 @@ rules are pure functions over plain data.
       splitter; idempotent chunk processor with per-chunk transaction;
       retries with backoff, DLQ, concurrency limiter; progress; rebuild
       trigger; Bull Board at `/admin/queues`; `POST /imports`, `GET /imports/:id`
-- [ ] Orders: `POST /orders` with `Idempotency-Key`, stored-response replay,
+- [x] Orders: `POST /orders` with `Idempotency-Key`, stored-response replay,
       409 on payload mismatch, conditional stock update, reservations with
       15-minute expiry, `POST /orders/:id/confirm`, `GET /orders/:id`,
       `reservations.release` repeatable job; concurrency tests
