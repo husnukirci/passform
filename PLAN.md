@@ -113,7 +113,7 @@ rules are pure functions over plain data.
 Designed on 2026-09-23 as Phases 9–11 (`PHASES.md`; design note
 `docs/superpowers/specs/2026-09-23-tier-2-design.md`), in build order:
 
-- [ ] Supplier price-and-stock partial-update endpoint exercising the fast
+- [x] Supplier price-and-stock partial-update endpoint exercising the fast
       index path (partial document updates, no rebuild); the stored stock
       subtracts open reservations so the release job cannot double-count
       (P9)

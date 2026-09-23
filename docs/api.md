@@ -1,7 +1,8 @@
 # REST API
 
 The read side of the contract (Phase 4, suppliers added in Phase 7), the
-import endpoints (Phase 5) and the order endpoints (Phase 6). Base URL in development:
+import endpoints (Phase 5), the order endpoints (Phase 6) and the supplier
+stock endpoint (Phase 9). Base URL in development:
 `http://localhost:4000`. Every body is JSON; every schema lives in
 `packages/contracts` and is the same definition the web app parses
 responses with (ADR 13). Ids are strings, money is integer cents, build
@@ -303,6 +304,99 @@ curl 'localhost:4000/suppliers'
 ```
 
 (Trimmed to the first two.)
+
+### `PATCH /suppliers/:id/stock`
+
+The fast index path (ADR 11): a supplier's price-and-stock delta is written
+to Postgres and then patched onto the live search alias, with no rebuild.
+Values are absolute, so the same body sent twice leaves the same state and
+a lost response is recovered by sending it again.
+
+JSON body `StockUpdateBody`:
+
+| Field               | Required | Notes                                                    |
+| ------------------- | -------- | -------------------------------------------------------- |
+| `rows`              | yes      | 1 to 1,000 rows; `sku` unique across rows                |
+| `rows[].sku`        | yes      | A SKU of this supplier                                   |
+| `rows[].priceCents` | no       | Integer ≥ 0                                              |
+| `rows[].stockQty`   | no       | Integer ≥ 0, what is on the supplier's shelf             |
+| (per row)           |          | At least one of `priceCents` and `stockQty` must be sent |
+
+A field a row does not carry keeps its current value. A reported
+`stockQty` is stored less the units held by open reservations on `placed`
+orders, which the release job would otherwise give back on top of the
+report; a confirmed order's reservation does not reduce it. SKUs that do
+not exist or belong to another supplier are listed in `unknown`, not
+rejected.
+
+Response: `200` with `StockUpdateResponse` once Postgres has committed,
+whatever happened to the index afterwards.
+
+| Field     | Type     | Notes                                                                                           |
+| --------- | -------- | ----------------------------------------------------------------------------------------------- |
+| `updated` | integer  | Rows that matched a part of this supplier and were written                                      |
+| `unknown` | string[] | SKUs that matched nothing, in request order                                                     |
+| `indexed` | boolean  | `false` when the index patch failed; Postgres is correct and the next rebuild repairs the index |
+
+Errors: `400` for a body that fails the schema (no rows, more than 1,000,
+a repeated `sku`, a row with neither field); `404` for an unknown
+supplier.
+
+```sh
+curl -X PATCH -H 'content-type: application/json' \
+  -d '{"rows":[{"sku":"PUL-0000007","priceCents":5490,"stockQty":12},{"sku":"EBR-0000010","stockQty":0},{"sku":"ZAB-0000004","priceCents":100}]}' \
+  localhost:4000/suppliers/s_01/stock
+```
+
+```json
+{ "updated": 2, "unknown": ["ZAB-0000004"], "indexed": true }
+```
+
+`ZAB-0000004` belongs to `s_02`, so it was neither written nor rejected. A
+search issued straight after shows the new price and availability:
+
+```sh
+curl 'localhost:4000/search?variantId=v_000113&q=PUL-0000007'
+```
+
+```json
+{
+  "hits": [
+    {
+      "id": "p_0000007",
+      "sku": "PUL-0000007",
+      "name": "Pulvane Starter motors C581",
+      "priceCents": 5490,
+      "inStock": true,
+      "fit": { "result": "fits", "reason": "Fits Varenta Rilla D22-55 (2006-01 → 2010-06)" }
+    }
+  ],
+  "stages": { "fitted": 1, "shown": 1 },
+  "page": 1,
+  "pageSize": 24
+}
+```
+
+(Hit trimmed to the fields the patch touches.)
+
+```sh
+curl -X PATCH -H 'content-type: application/json' \
+  -d '{"rows":[{"sku":"PUL-0000007"}]}' localhost:4000/suppliers/s_01/stock
+```
+
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed",
+  "issues": [{ "path": "rows.0", "message": "expected priceCents or stockQty" }]
+}
+```
+
+An unknown supplier:
+
+```json
+{ "statusCode": 404, "message": "supplier s_99 not found" }
+```
 
 ## Search
 

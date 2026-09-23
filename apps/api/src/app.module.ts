@@ -10,6 +10,7 @@ import { ImportsModule } from "./imports/imports.module.js";
 import { ErrorFilter } from "./infra/http/error.filter.js";
 import { OrdersModule } from "./orders/orders.module.js";
 import { SearchModule } from "./search/search.module.js";
+import { StockModule } from "./stock/stock.module.js";
 import { VehiclesModule } from "./vehicles/vehicles.module.js";
 
 @Module({
@@ -19,6 +20,7 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
     SearchModule,
     ImportsModule,
     OrdersModule,
+    StockModule,
     // The queue dashboard; unauthenticated by design in this local-first stack (ADR 12).
     BullBoardModule.forRoot({ route: "/admin/queues", adapter: ExpressAdapter }),
   ],
