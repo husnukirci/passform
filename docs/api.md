@@ -276,6 +276,32 @@ curl 'localhost:4000/categories'
 
 (Trimmed to the first root.)
 
+## Suppliers
+
+### `GET /suppliers`
+
+The suppliers an import can be filed under (the imports page offers them as
+a list). No parameters.
+
+| Field       | Type             | Notes |
+| ----------- | ---------------- | ----- |
+| `suppliers` | `{ id, name }[]` | By id |
+
+```sh
+curl 'localhost:4000/suppliers'
+```
+
+```json
+{
+  "suppliers": [
+    { "id": "s_01", "name": "Brenholt Distribution" },
+    { "id": "s_02", "name": "Calmere Autoparts" }
+  ]
+}
+```
+
+(Trimmed to the first two.)
+
 ## Search
 
 ### `GET /search?variantId=&q=&category=&brand=&axle=&sort=&page=`

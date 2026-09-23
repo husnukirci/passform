@@ -8,6 +8,7 @@ import { CatalogService } from "./catalog.service.js";
 import { CategoriesRepository } from "./categories.repository.js";
 import { fitment, part } from "./fixtures.js";
 import { type PartRecord, PartsRepository } from "./parts.repository.js";
+import { SuppliersRepository } from "./suppliers.repository.js";
 
 const record: PartRecord = {
   part: part(),
@@ -23,16 +24,30 @@ async function serviceWith(records: Record<string, PartRecord>): Promise<Catalog
     findById: async (id) => (id === "v_000001" ? variant() : null),
   };
   const categories: Pick<CategoriesRepository, "tree"> = { tree: async () => [] };
+  const suppliers: Pick<SuppliersRepository, "all"> = {
+    all: async () => [{ id: "s_01", name: "Brenholt Distribution" }],
+  };
   const moduleRef = await Test.createTestingModule({
     providers: [
       CatalogService,
       { provide: PartsRepository, useValue: parts },
       { provide: VehiclesRepository, useValue: vehicles },
       { provide: CategoriesRepository, useValue: categories },
+      { provide: SuppliersRepository, useValue: suppliers },
     ],
   }).compile();
   return moduleRef.get(CatalogService);
 }
+
+describe("CatalogService.supplierList", () => {
+  it("wraps the repository rows", async () => {
+    const service = await serviceWith({});
+
+    await expect(service.supplierList()).resolves.toEqual({
+      suppliers: [{ id: "s_01", name: "Brenholt Distribution" }],
+    });
+  });
+});
 
 describe("CatalogService.partDetail", () => {
   it("returns the part with its path and fitments, and fit null without a variant", async () => {

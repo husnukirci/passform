@@ -1,10 +1,16 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import type { CategoriesResponse, PartDetailQuery, PartDetailResponse } from "@passform/contracts";
+import type {
+  CategoriesResponse,
+  PartDetailQuery,
+  PartDetailResponse,
+  SuppliersResponse,
+} from "@passform/contracts";
 import { evaluateFit } from "@passform/domain";
 
 import { VehiclesRepository } from "../vehicles/vehicles.repository.js";
 import { CategoriesRepository } from "./categories.repository.js";
 import { PartsRepository } from "./parts.repository.js";
+import { SuppliersRepository } from "./suppliers.repository.js";
 
 @Injectable()
 export class CatalogService {
@@ -12,10 +18,15 @@ export class CatalogService {
     private readonly categories: CategoriesRepository,
     private readonly parts: PartsRepository,
     private readonly vehicles: VehiclesRepository,
+    private readonly suppliers: SuppliersRepository,
   ) {}
 
   async categoryTree(): Promise<CategoriesResponse> {
     return { categories: await this.categories.tree() };
+  }
+
+  async supplierList(): Promise<SuppliersResponse> {
+    return { suppliers: await this.suppliers.all() };
   }
 
   /** Fit is evaluated only when a variant is named; the detail page has no axle choice. */
