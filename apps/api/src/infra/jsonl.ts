@@ -14,9 +14,14 @@ export class JsonlWriter {
     this.stream = createWriteStream(path);
   }
 
-  async write(value: unknown): Promise<void> {
+  write(value: unknown): Promise<void> {
+    return this.writeLine(JSON.stringify(value));
+  }
+
+  /** Appends one already-serialised line, so a splitter can copy without re-encoding. */
+  async writeLine(line: string): Promise<void> {
     this.lines += 1;
-    if (!this.stream.write(`${JSON.stringify(value)}\n`)) {
+    if (!this.stream.write(`${line}\n`)) {
       await once(this.stream, "drain");
     }
   }
