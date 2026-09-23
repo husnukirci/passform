@@ -60,3 +60,157 @@ Format: `- <phase> | <what happened> | <what changed as a result>`.
 - P7 | The spec says `/parts` without a query parameter still knows the vehicle from the cookie. A curl of a cold document load returned 200 rather than 307: with a `loading.tsx` boundary Next streams the shell first and completes the redirect with a meta refresh from inside the stream. Client-side navigations redirect at once. | Kept the loading skeleton (spec item 10) and the redirect, verified both by curl and in the browser, and recorded the streaming behaviour in ADR 15.
 - P7 | Port 3000 was held by a dev server from a different project on this machine. | Ran the web app on 3001 for QA with `WEB_ORIGIN=http://localhost:3001` on the API; the committed defaults stay at 3000, and the origin is configurable for exactly this reason.
 - P7 | The spec wants the import path input "defaulting to the last generated file name", which the browser cannot know. | Defaults to `imports/s_01-2500.jsonl`, the file the QA script generates, with the generate command shown next to the input.
+- P8 | The API listening on port 4000 at the start of the session was a build that predated `GET /suppliers`; the automated check of every `docs/api.md` example reported it as a 404 before anything else was read. | Rebuilt and restarted the API first; every example in the document was re-run against that build.
+- P8 | The first expiry check sent two updates in one `psql -c` call and the second named an `expires_at` column that `orders` does not have, so both rolled back and the order sat `placed` for the whole 80-second wait. | Backdated the reservation row alone; the release job expired the order 56 s later and confirm answered `409` as the document says.
+- P8 | ADR 3 promised a contracts test pinning `ImportRow` to a zod schema "once Phase 4 adds it"; Phase 4 never added one because the API validates supplier rows through the domain directly. The audit found the stale promise, not the code. | Amended ADR 3 rather than adding a schema nothing would use.
+- P8 | The Phase 7 screenshots carried the Next.js dev-mode badge in the corner. | Retaken from the production build that the Lighthouse run needed anyway.
+
+## Per-phase narrative
+
+Written at the end, from the log above and the PR descriptions; nothing
+here is remembered from chat.
+
+**Phase 0, scaffold.** The phase spec named the latest Nest CLI, whose
+template was a Nest major that `nestjs-zod` could not accept as a peer, so
+the app files were written by hand against Nest 11. Three more version
+pins came out of the same afternoon (ESLint 9, vitest 5, and dropping
+`unplugin-swc` after a throwaway constructor-injection test showed vitest 5
+already honoured decorator metadata). The most useful thing the phase
+produced was CI failing for a real reason: the "verify services" step
+called `redis-cli`, which the runner image does not ship and which the spec
+had never asked for. The replacement was tested against the compose Redis
+before it was pushed.
+
+**Phase 1, domain core.** Strict red-green-refactor worked as intended:
+every test was seen failing first, and the mutation check in the phase
+checklist (flip one comparison, count the broken tests) broke six. Two
+generated drafts were wrong in ways the tests as written could not have
+found. `chunkRanges` would have looped forever on a chunk size of zero,
+which the spec's signature allowed; reading the signature against the
+spec, not a test, found it, and a failing test followed. The first green
+`validateImportRow` was an eleven-way wall of `undefined` checks; the
+refactor step existed for exactly that. The first fixture make and brand
+names sat too close to real companies and were renamed before the commit.
+
+**Phase 2, schema and generator.** The naming problem became visible at
+scale: of 72 model names drafted as dictionary words, first names and place
+names, a web check found 25 colliding with real models or marques, while
+every invented compound was clean. Every name became a compound, and when
+two verification subagents exhausted the session's search budget, the last
+19 were checked against Wikipedia's search API from the shell with a known
+real model as the control that had to return hits. Sampling the seeded
+rows found two generator bugs no unit test targeted: fitment windows
+running to 2033, and a part with three fitments where the minimum was
+four. Review found a `TRUNCATE ... CASCADE` that never reached `orders`;
+the fix came with an integration test that inserts an order and proves a
+reseed clears it.
+
+**Phase 3, index.** Two spec assumptions did not survive the client
+library: the latest Elasticsearch client speaks 9.x to an 8.19 server, and
+`helpers.bulk` flushes by bytes, not document count. The review checklist
+found the one real bug of the phase: the builder's catch block deleted the
+new index on any error, including a failure after the alias had already
+moved, which would have removed the live index. That fix is its own
+commit.
+
+**Phase 4, read API.** A runtime probe before any endpoint existed showed
+the built API could not load the domain package at all: Node strips types
+but does not rewrite `./types.js`, and Phase 2 had hidden this behind
+`tsx`. ADR 14 was amended before the first controller was written. The
+most instructive failure was a `CatalogService` draft with a field and a
+method both named `categories` and a `never[]` inferred for the tree's
+children; every unit test passed because vitest transpiles without type
+checking, and `tsc -b` caught both. From then on typecheck ran after every
+module, not once at the end. Two integration tests had been drafted
+against the generator's "guarantees", which reading `synth.ts` showed were
+statistical; they now select their rows by SQL.
+
+**Phase 5, import pipeline.** The hardest debugging of the project. The
+first integration run killed the vitest worker with a 4 GB heap after 28
+seconds and no output. The cause was BullMQ 6 loading ioredis with
+`require`, which the API's native ES modules lack, so every connection
+failed and retried forever; the buffered console had died with the
+process, and `--disable-console-intercept` was what made the retry loop
+visible. The spec's job id format used a colon, which BullMQ 6 refuses,
+and that surfaced only as a 500 in an integration test. Two spec items
+contradicted each other about when an import is `partial`; the stricter
+reading won and went into ADR 8. The throughput script's search poll had
+exited on a scripting error before sending a request, noticed at the 40%
+mark; `docs/numbers.md` said so rather than quoting a full-run figure, and
+the Phase 8 re-run verifies the poll is alive before the import starts.
+
+**Phase 6, orders.** The integration test's "GET returns the created body"
+assertion caught a real bug: line order differed between the stored
+response and the current view for a two-line order. The generated
+migration for the fix was a bare `ADD COLUMN ... NOT NULL` that failed only
+because the dev database had leftover rows; on an empty database it would
+have passed and shipped a migration that breaks on any populated table.
+BullMQ 6's scheduler API replaced the spec's deprecated `repeat` option,
+and the running app proved the job fires by expiring a backdated order on
+its own.
+
+**Phase 7, web.** Mostly framework friction: the React compiler lint rule
+in `eslint-config-next` rejected the first hydration flag, jsdom rewrote
+`import.meta.url` under the tokens test, and `consistent-type-imports`
+refused a `typeof import()` in a mock. One spec assumption was shown false
+by curl: with a `loading.tsx` boundary a cold load of `/parts` completes
+its redirect from inside the stream rather than with a 307, and ADR 15
+records it. The spec asked for a supplier select without an endpoint that
+lists suppliers; `GET /suppliers` was added with the usual coverage rather
+than hard-coding the generator's list into the web app.
+
+**Phase 8, docs.** The process on port 4000 was stale, one ADR promised a
+test that was never needed, and my own SQL broke the first expiry check.
+Every example in `docs/api.md` was re-run, the numbers were re-measured on
+the final commit, and the name scrub over the tree and the full history
+came back empty.
+
+## Closing reflection
+
+The project was built in nine Claude Code sessions over two days, one
+phase per session, 105 commits before this phase. What the log shows,
+read plainly:
+
+**What the tests caught.** The alias-swap deletion of the live index, the
+SKU-sorted order lines, the truncate that missed `orders`, the
+never-terminating `chunkRanges`, the hydration and mock lint failures.
+Every one of these was a generated bug that a test, a lint rule or a
+checklist item found before a commit. The strict-TDD domain package was
+the cheapest part of the project to keep correct, and it was the part with
+the fewest surprises later.
+
+**What the tests did not catch.** The tests were written by the same model
+that wrote the code, and they shared its blind spots. The `never[]`
+inference and the duplicate `categories` name passed every unit test and
+fell to `tsc`. The migration that only failed on a dirty database would
+have passed on a clean one. The throughput poll that never ran produced an
+empty tally, not a failure. The 2033 fitment windows and the three-fitment
+part were found by looking at the data, not by a test. The pattern is
+consistent: generated tests confirm the behaviour the generator intended,
+and the bugs that matter are the ones it did not intend. Type checking,
+reading the spec again, sampling real output and running the thing were
+the checks that found those.
+
+**Where the specs were wrong.** Every phase spec was written before its
+code, and several of its library facts were stale: the latest Nest, the
+latest Elasticsearch client, a bulk helper option that does not exist, a
+job id format BullMQ refuses, a deprecated repeat API. None of this cost
+more than an hour, because each phase started with a probe of the risky
+assumption before building on it. ADR 14 is the counter-example: it was
+written in Phase 0 claiming a runtime path that had not been tried, Phase
+2 sidestepped the failure, and Phase 4 paid for it. The rule I would take
+from this is that an ADR describing a runtime mechanism gets a running
+probe in the same commit.
+
+**Names.** The model's first instinct for a vehicle or brand name is a
+real one, or a word that a real one already uses. A third of the first
+model names collided. Invented compounds did not, and the single name file
+plus a blocklist grep at the end is a small price for a rule the project
+cannot afford to break.
+
+**What I would change.** Run `tsc -b` inside the unit test script from the
+first commit. Write the runtime probe before the ADR, not after. Budget for
+verification that involves the web, which is slower and more rationed than
+anything else in a session. And keep the friction log as it was kept here,
+one line at the time it happens; the narrative above was easy to write
+because the log existed, and it would have been fiction without it.

@@ -104,7 +104,7 @@ rules are pure functions over plain data.
 - [x] Web: `/` vehicle picker + disambiguation, `/parts` results with stage
       strip and fit badges, `/parts/[sku]`, `/cart`, `/orders/[id]` with
       "send again" and "confirm", `/imports`
-- [ ] Docs: README (arch diagram, quick start, numbers, screenshots),
+- [x] Docs: README (arch diagram, quick start, numbers, screenshots),
       `docs/decisions.md` (ADRs), `docs/api.md`, `CLAUDE.md`,
       `docs/ai-workflow.md`; name scrub; `v1.0.0` tag
 
